@@ -1,0 +1,457 @@
+const { GOTO_OPTS } = require('../macromatix/browser');
+const { withPageContextRetry } = require('../macromatix/contextRetry');
+const { setReportStartDate, setReportEndDate } = require('../macromatix/radDatePicker');
+const { resolveReportDate } = require('../utils/dates');
+const log = require('../utils/logging');
+
+async function openReportSelectionPage(page, reportNav, navTimeoutMs) {
+    log.info(`Opening Report Selection: ${reportNav.url}`);
+    await page.goto(reportNav.url, { ...GOTO_OPTS, timeout: navTimeoutMs });
+    await page.waitForTimeout(reportNav.waitAfterNavigateMs || 2000);
+}
+
+async function setGroupDropdown(page, groupName) {
+    const set = await page.evaluate((group) => {
+        const want = group.toLowerCase();
+        for (const sel of document.querySelectorAll('select')) {
+            const ctx = ((sel.closest('tr, td, div') || sel).innerText || '').toLowerCase();
+            if (!ctx.includes('group') && !Array.from(sel.options).some((o) => o.text.toLowerCase().includes('supply'))) {
+                continue;
+            }
+            for (const opt of sel.options) {
+                if ((opt.textContent || '').trim().toLowerCase().includes(want)) {
+                    sel.value = opt.value;
+                    sel.dispatchEvent(new Event('change', { bubbles: true }));
+                    return opt.textContent.trim();
+                }
+            }
+        }
+        for (const sel of document.querySelectorAll('select')) {
+            for (const opt of sel.options) {
+                if ((opt.textContent || '').trim().toLowerCase().includes(want)) {
+                    sel.value = opt.value;
+                    sel.dispatchEvent(new Event('change', { bubbles: true }));
+                    return opt.textContent.trim();
+                }
+            }
+        }
+        return null;
+    }, groupName);
+
+    if (!set) throw new Error(`Group dropdown: could not select "${groupName}"`);
+    log.info(`Group set to: ${set}`);
+    await page.waitForTimeout(1500);
+}
+
+async function selectReportInList(page, reportName, opts = {}) {
+    const loose = Boolean(opts.loose);
+    const picked = await page.evaluate(
+        (name, looseMode) => {
+        const want = name.toLowerCase();
+        for (const sel of document.querySelectorAll('select')) {
+            const label = ((sel.closest('tr, td') || sel).innerText || '').toLowerCase();
+            const hasInventory = Array.from(sel.options).some((o) => /inventory|special event/i.test(o.text));
+            const hasScm = Array.from(sel.options).some((o) => /scm|items on/i.test(o.text));
+            if (
+                !looseMode &&
+                !label.includes('report') &&
+                !hasScm
+            ) {
+                continue;
+            }
+            if (looseMode && !label.includes('report') && !hasInventory && !hasScm) {
+                continue;
+            }
+            for (const opt of sel.options) {
+                const t = (opt.textContent || '').trim();
+                if (t.toLowerCase().includes(want) || want.includes(t.toLowerCase())) {
+                    if (sel.multiple) {
+                        for (const o of sel.options) o.selected = false;
+                    }
+                    opt.selected = true;
+                    sel.dispatchEvent(new Event('change', { bubbles: true }));
+                    sel.dispatchEvent(new Event('click', { bubbles: true }));
+                    return t;
+                }
+            }
+        }
+        return null;
+    },
+        reportName,
+        loose
+    );
+
+    if (!picked) throw new Error(`Reports list: could not select "${reportName}"`);
+    log.info(`Report selected: ${picked}`);
+    await page.waitForTimeout(2000);
+}
+
+function formatNeedles(formatText) {
+    const want = String(formatText || '').trim().toLowerCase();
+    const needles = new Set([want]);
+    if (want === 'csv') {
+        needles.add('comma');
+        needles.add('delimited');
+        needles.add('separated');
+    }
+    if (want.includes('excel')) {
+        needles.add('excel data only');
+        needles.add('data only');
+    }
+    return [...needles];
+}
+
+async function pickFormatInPage(page, needles) {
+    return page.evaluate((needlesArr) => {
+        const matches = (text) => {
+            const t = String(text || '').trim().toLowerCase();
+            return needlesArr.some((n) => t.includes(n) || (n.length > 3 && t === n));
+        };
+        for (const sel of document.querySelectorAll('select')) {
+            const near = (sel.closest('tr, td, div') || sel).innerText || '';
+            if (
+                !/excel|format|report|csv|comma/i.test(near) &&
+                !Array.from(sel.options).some((o) => /excel|csv|comma/i.test(o.text))
+            ) {
+                continue;
+            }
+            for (const opt of sel.options) {
+                if (matches(opt.textContent)) {
+                    sel.value = opt.value;
+                    sel.dispatchEvent(new Event('change', { bubbles: true }));
+                    return opt.textContent.trim();
+                }
+            }
+        }
+        for (const sel of document.querySelectorAll('select')) {
+            for (const opt of sel.options) {
+                if (matches(opt.textContent)) {
+                    sel.value = opt.value;
+                    sel.dispatchEvent(new Event('change', { bubbles: true }));
+                    return opt.textContent.trim();
+                }
+            }
+        }
+        for (const inp of document.querySelectorAll('input[type="radio"]')) {
+            const label =
+                (inp.id && document.querySelector(`label[for="${inp.id}"]`)?.textContent) ||
+                inp.parentElement?.textContent ||
+                '';
+            if (matches(label)) {
+                inp.click();
+                return label.trim().slice(0, 80);
+            }
+        }
+        return null;
+    }, needles);
+}
+
+async function setReportFormat(page, formatText) {
+    const needles = formatNeedles(formatText);
+
+    await page
+        .waitForFunction(
+            () => {
+                for (const sel of document.querySelectorAll('select')) {
+                    if (Array.from(sel.options).some((o) => /excel|csv|comma|format/i.test(o.textContent || ''))) {
+                        return true;
+                    }
+                }
+                return document.querySelectorAll('input[type="radio"]').length > 0;
+            },
+            { timeout: 20000 }
+        )
+        .catch(() => null);
+    await page.waitForTimeout(1500);
+
+    let picked = null;
+    for (let attempt = 1; attempt <= 4; attempt++) {
+        picked = await pickFormatInPage(page, needles);
+        if (picked) break;
+        log.warn(`Format "${formatText}" not ready (attempt ${attempt}/4), waiting…`);
+        await page.waitForTimeout(1500);
+    }
+
+    if (!picked) {
+        const available = await page.evaluate(() => {
+            const out = [];
+            for (const sel of document.querySelectorAll('select')) {
+                const opts = Array.from(sel.options).map((o) => o.textContent.trim());
+                if (opts.some((o) => /excel|csv|format|comma/i.test(o))) out.push(...opts);
+            }
+            return [...new Set(out)].slice(0, 20).join(' | ');
+        });
+        throw new Error(
+            `Format dropdown: could not select "${formatText}"` +
+                (available ? `. Options seen: ${available}` : '')
+        );
+    }
+    log.info(`Report format: ${picked}`);
+    await page.waitForTimeout(500);
+}
+
+async function setStartDate(page, dateText) {
+    return setReportStartDate(page, dateText);
+}
+
+async function setEndDate(page, dateText) {
+    return setReportEndDate(page, dateText);
+}
+
+function storeNeedles(storeName) {
+    const s = String(storeName || '').trim();
+    const needles = new Set();
+    if (s) needles.add(s.toLowerCase());
+    const num = s.match(/\b(\d{4})\b/);
+    if (num) needles.add(num[1]);
+    const nameOnly = s.replace(/^\d+\s*/, '').trim().toLowerCase();
+    if (nameOnly) needles.add(nameOnly);
+    return [...needles];
+}
+
+async function tryStoreDropdown(page, needle) {
+    return page.evaluate((want) => {
+        for (const sel of document.querySelectorAll('select')) {
+            const ctx = ((sel.closest('tr, td, div, table') || sel).innerText || '').toLowerCase();
+            if (!ctx.includes('store') && !Array.from(sel.options).some((o) => /\b\d{4}\b/.test(o.text))) {
+                continue;
+            }
+            for (const opt of sel.options) {
+                const t = (opt.textContent || '').trim().toLowerCase();
+                if (t.includes(want) || want.includes(t)) {
+                    sel.value = opt.value;
+                    sel.dispatchEvent(new Event('change', { bubbles: true }));
+                    return opt.textContent.trim();
+                }
+            }
+        }
+        return null;
+    }, needle);
+}
+
+async function expandStoreTree(page) {
+    await page.evaluate(() => {
+        for (const el of document.querySelectorAll('a, span, label, div, img, td')) {
+            const t = (el.textContent || el.title || '').replace(/\s+/g, ' ').trim().toLowerCase();
+            if (t.includes('tba area') || t.includes('collins food') || t.includes('tba market')) {
+                try {
+                    el.click();
+                } catch (e) {
+                    /* ignore */
+                }
+            }
+        }
+    });
+    await page.waitForTimeout(800);
+}
+
+async function tryStoreTree(page, needle) {
+    await expandStoreTree(page);
+
+    return page.evaluate((want) => {
+        for (const cb of document.querySelectorAll('input[type="checkbox"]')) {
+            const row = cb.closest('tr, div, li, span, label') || cb.parentElement;
+            const text = (row && row.textContent ? row.textContent : '').replace(/\s+/g, ' ').toLowerCase();
+            if (text.includes(want)) {
+                row?.scrollIntoView?.({ block: 'center' });
+                if (!cb.checked) cb.click();
+                return text.trim().slice(0, 80);
+            }
+        }
+        for (const el of document.querySelectorAll('label, span, a, option, td')) {
+            const t = (el.textContent || '').replace(/\s+/g, ' ').trim();
+            if (t.toLowerCase().includes(want) && t.length < 60) {
+                el.scrollIntoView?.({ block: 'center' });
+                const cb = el.querySelector('input[type="checkbox"]') || el.previousElementSibling;
+                if (cb && cb.type === 'checkbox') {
+                    if (!cb.checked) cb.click();
+                    return t;
+                }
+            }
+        }
+        return null;
+    }, needle);
+}
+
+async function tryStoreClickByText(page, needle) {
+    const handle = await page.evaluateHandle((want) => {
+        for (const el of document.querySelectorAll('label, span, a, td, div')) {
+            const t = (el.textContent || '').replace(/\s+/g, ' ').trim().toLowerCase();
+            if (!t.includes(want) || t.length > 70) continue;
+            if (el.children.length > 4) continue;
+            const cb = el.querySelector('input[type="checkbox"]');
+            if (cb) return cb;
+            if (/\b\d{4}\b/.test(t)) return el;
+        }
+        return null;
+    }, needle);
+    const el = handle.asElement();
+    if (!el) return null;
+    await el.evaluate((node) => node.scrollIntoView({ block: 'center' }));
+    await page.waitForTimeout(200);
+    await el.click();
+    const label = await el.evaluate((node) => {
+        const row = node.closest('tr, div, li, span, label') || node;
+        return (row.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 80);
+    });
+    return label || needle;
+}
+
+async function tryStoreInFrames(page, needles) {
+    for (const frame of page.frames()) {
+        if (frame === page.mainFrame()) continue;
+        for (const needle of needles) {
+            try {
+                const picked = await frame.evaluate((want) => {
+                    for (const cb of document.querySelectorAll('input[type="checkbox"]')) {
+                        const row = cb.closest('tr, div, li, span, label') || cb.parentElement;
+                        const text = (row?.textContent || '').replace(/\s+/g, ' ').toLowerCase();
+                        if (text.includes(want)) {
+                            if (!cb.checked) cb.click();
+                            return text.trim().slice(0, 80);
+                        }
+                    }
+                    for (const sel of document.querySelectorAll('select')) {
+                        for (const opt of sel.options) {
+                            if ((opt.textContent || '').toLowerCase().includes(want)) {
+                                sel.value = opt.value;
+                                sel.dispatchEvent(new Event('change', { bubbles: true }));
+                                return opt.textContent.trim();
+                            }
+                        }
+                    }
+                    return null;
+                }, needle);
+                if (picked) return picked;
+            } catch (e) {
+                /* frame detached */
+            }
+        }
+    }
+    return null;
+}
+
+async function selectStore(page, storeName, opts = {}) {
+    if (opts.waitMs) await page.waitForTimeout(opts.waitMs);
+
+    const needles = storeNeedles(storeName);
+
+    for (const needle of needles) {
+        const fromDropdown = await tryStoreDropdown(page, needle);
+        if (fromDropdown) {
+            log.info(`Store selected (dropdown): ${fromDropdown}`);
+            await page.waitForTimeout(500);
+            return;
+        }
+    }
+
+    for (const needle of needles) {
+        const fromTree = await tryStoreTree(page, needle);
+        if (fromTree) {
+            log.info(`Store selected: ${fromTree}`);
+            await page.waitForTimeout(500);
+            return;
+        }
+    }
+
+    for (const needle of needles) {
+        const clicked = await tryStoreClickByText(page, needle);
+        if (clicked) {
+            log.info(`Store selected (click): ${clicked}`);
+            await page.waitForTimeout(500);
+            return;
+        }
+    }
+
+    const fromFrame = await tryStoreInFrames(page, needles);
+    if (fromFrame) {
+        log.info(`Store selected (frame): ${fromFrame}`);
+        await page.waitForTimeout(500);
+        return;
+    }
+
+    if (opts.optional) {
+        log.warn(`Store not found for "${storeName}" — continuing (optional)`);
+        return;
+    }
+
+    throw new Error(`Store: could not select "${storeName}" (tried: ${needles.join(', ')})`);
+}
+
+async function clickGenerate(page, buttonText = 'Generate') {
+    const clicked = await page.evaluate((label) => {
+        const want = label.toLowerCase();
+        for (const el of document.querySelectorAll('input, button, a')) {
+            const t = (el.value || el.textContent || '').trim().toLowerCase();
+            if (t === want || t.includes(want)) {
+                el.click();
+                return t || label;
+            }
+        }
+        return null;
+    }, buttonText);
+
+    if (!clicked) throw new Error(`Generate button not found`);
+    log.info('Clicked Generate');
+    await page.waitForTimeout(1000);
+}
+
+function dateOpts(report) {
+    return { timeZone: report.timeZone, dateOnly: Boolean(report.dateOnly) };
+}
+
+async function configureAndGenerateReport(page, report, reportNav) {
+    await openReportSelectionPage(page, reportNav, report.navTimeoutMs || 45000);
+    await setGroupDropdown(page, report.group || 'Supply Chain');
+    await selectReportInList(page, report.reportName);
+    await setReportFormat(page, report.format || 'Excel Data Only');
+    await page.waitForTimeout(1000);
+
+    const startDate = resolveReportDate(report.startDate || 'lastWeekMonday', dateOpts(report));
+    await setStartDate(page, startDate);
+
+    if (report.endDate) {
+        const endDate = resolveReportDate(report.endDate, dateOpts(report));
+        await setEndDate(page, endDate);
+    }
+
+    if (report.storeName) {
+        await selectStore(page, report.storeName);
+    }
+
+    await clickGenerate(page, report.generateButtonText || 'Generate');
+}
+
+async function runSupplyChainReport(page, report, settings) {
+    const reportNav = settings.pipeline.reportNavigation;
+    if (!reportNav?.url) {
+        throw new Error('pipeline.reportNavigation.url is required');
+    }
+
+    const cfg = {
+        ...report,
+        navTimeoutMs: settings.navTimeoutMs,
+    };
+
+    await withPageContextRetry(page, `supply chain ${report.id}`, async () => {
+        await configureAndGenerateReport(page, cfg, reportNav);
+    });
+}
+
+function isSupplyChainReport(report) {
+    return report.type === 'supplyChain';
+}
+
+module.exports = {
+    openReportSelectionPage,
+    setGroupDropdown,
+    selectReportInList,
+    setReportFormat,
+    setStartDate,
+    setEndDate,
+    selectStore,
+    clickGenerate,
+    configureAndGenerateReport,
+    runSupplyChainReport,
+    isSupplyChainReport,
+};

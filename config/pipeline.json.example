@@ -1,0 +1,47 @@
+{
+  "gate": {
+    "url": "https://tacobellau.macromatix.net/MMS_Stores_StockCount.aspx?MenuCustomItemID=156",
+    "readySelector": "table",
+    "countTypeText": "Key Item Count",
+    "appliedStatusText": "Applied",
+    "minCompleteCount": 1,
+    "evaluateComplete": null
+  },
+  "reportNavigation": {
+    "url": "https://tacobellau.macromatix.net/MMS_System_Reports.aspx?MenuCustomItemID=12",
+    "menuPath": ["Report Selection", "Supply Chain"],
+    "waitAfterNavigateMs": 2000
+  },
+  "reports": [
+    {
+      "id": "report1",
+      "label": "Report 1",
+      "url": "https://tacobellau.macromatix.net/REPLACE_REPORT_1.aspx",
+      "waitAfterNavigateMs": 2000,
+      "exportButtonSelector": "input[value='Export']",
+      "exportLinkText": "Excel Data Only",
+      "expectedHeaders": ["ColumnA", "ColumnB"]
+    },
+    {
+      "id": "report2",
+      "label": "Report 2",
+      "url": "https://tacobellau.macromatix.net/REPLACE_REPORT_2.aspx",
+      "waitAfterNavigateMs": 2000,
+      "exportButtonSelector": "input[value='Export']",
+      "exportLinkText": "Excel Data Only",
+      "expectedHeaders": ["ColumnA", "ColumnB"]
+    }
+  ],
+  "paste": {
+    "url": "https://tacobellau.macromatix.net/REPLACE_ENTRY_PAGE.aspx",
+    "readySelector": "form#aspnetForm",
+    "fields": [
+      {
+        "key": "value1",
+        "selector": "#ctl00_ph_txtField1",
+        "type": "text"
+      }
+    ],
+    "submitSelector": "input[type='submit'][value='Save']"
+  }
+}
