@@ -21,6 +21,12 @@ fi
 
 chmod +x "$REPO/scripts/pi-git-pull.sh"
 
+if [ ! -f "$REPO/.env.production" ] && [ ! -f "$REPO/.env" ]; then
+    echo "ERROR: Create $REPO/.env.production before starting services (see docs/raspberry-pi-setup.md §3)." >&2
+    echo "  cp .env.example .env.production && nano .env.production" >&2
+    exit 1
+fi
+
 for f in mmx-gate-watch.service mmx-pipeline.service mmx-pipeline.timer mmx-git-pull.service mmx-git-pull.timer; do
     sed -e "s|MMX_USER|$MMX_USER|g" -e "s|MMX_HOME|$MMX_HOME|g" "$SCRIPT_DIR/$f" | sudo tee "/etc/systemd/system/$f" >/dev/null
 done

@@ -7,8 +7,9 @@ Wants=network-online.target
 Type=oneshot
 User=MMX_USER
 WorkingDirectory=MMX_HOME/mmx-report-automation
-EnvironmentFile=MMX_HOME/mmx-report-automation/.env.production
-ExecStartPre=MMX_HOME/mmx-report-automation/scripts/pi-git-pull.sh
+EnvironmentFile=-MMX_HOME/mmx-report-automation/.env.production
+EnvironmentFile=-MMX_HOME/mmx-report-automation/.env
+ExecStartPre=/bin/bash MMX_HOME/mmx-report-automation/scripts/pi-git-pull.sh
 ExecStart=/usr/bin/npm start
 TimeoutStartSec=2400
 

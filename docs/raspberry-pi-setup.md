@@ -325,6 +325,13 @@ rm -f data/out/pipeline-complete-today.json
 
 ## 11. Troubleshooting
 
+| Log message | Fix |
+|-------------|-----|
+| `Failed to load environment files: No such file or directory` | Create `.env.production` (or `.env`) in the repo — see §3 |
+| `Failed to spawn 'start-pre' task` | Run `git pull`, then `chmod +x scripts/pi-git-pull.sh`; re-run `install-units.sh` |
+| Gate-watch restart loop | Fix env + script, then `sudo systemctl restart mmx-gate-watch` |
+
+
 | Symptom | What to try |
 |---------|-------------|
 | `Failed to launch the browser` | Install Chromium; set `SCRAPER_EXECUTABLE_PATH` to `which chromium` output |
