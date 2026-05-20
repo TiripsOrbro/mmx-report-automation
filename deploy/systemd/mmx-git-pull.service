@@ -1,0 +1,15 @@
+[Unit]
+Description=Pull latest mmx-report-automation from git
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=MMX_USER
+Environment=MMX_REPO_DIR=MMX_HOME/mmx-report-automation
+Environment=MMX_RESTART_UNITS=mmx-gate-watch
+WorkingDirectory=MMX_HOME/mmx-report-automation
+ExecStart=MMX_HOME/mmx-report-automation/scripts/pi-git-pull.sh
+
+[Install]
+WantedBy=multi-user.target

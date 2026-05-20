@@ -1,0 +1,10 @@
+[Unit]
+Description=Run Macromatix full pipeline daily
+
+[Timer]
+OnCalendar=*-*-* 11:00:00
+Persistent=true
+Unit=mmx-pipeline.service
+
+[Install]
+WantedBy=timers.target

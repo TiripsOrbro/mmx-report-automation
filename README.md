@@ -133,7 +133,7 @@ cd Y:\Taco Bell Dashboard\mmx-report-automation
 node src\run.js
 ```
 
-**Raspberry Pi** — see **[docs/raspberry-pi-setup.md](docs/raspberry-pi-setup.md)** for Chromium install, `.env.production`, first-run bootstrap, `mmx-gate-watch.service`, and `mmx-pipeline.timer`.
+**Raspberry Pi** — see **[docs/raspberry-pi-setup.md](docs/raspberry-pi-setup.md)** for Chromium, bootstrap, and **`./deploy/systemd/install-units.sh`** (gate-watch with auto-restart, git pull every 15 min, daily pipeline timer).
 
 ## Project layout
 

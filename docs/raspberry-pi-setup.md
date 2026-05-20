@@ -6,10 +6,13 @@ Deploy the Macromatix pipeline on a fresh Pi alongside [live-dashboard-app](http
 
 | Job | Command | Purpose |
 |-----|---------|---------|
-| **Gate watch** (always on) | `npm run gate-watch` | Hourly key-item gate check, 9 AM–11 PM store time |
+| **Gate watch** (always on) | `npm run gate-watch` | Hourly key-item gate check, 9 AM–11 PM; **restarts on crash**; pauses after daily pipeline |
+| **Git pull** (every 15 min) | `scripts/pi-git-pull.sh` | `git pull --ff-only`; restarts gate-watch when code changes |
 | **Full pipeline** (scheduled) | `npm start` | Gate → 3 reports → Excel → all scheduled orders (once per day) |
 
-`gate-watch` only logs whether the gate is READY. It does **not** start downloads or orders. After **`npm start`** finishes for the day, gate-watch **stops checking** until the next calendar day (same `data/out/pipeline-complete-today.json` lock). Schedule `npm start` separately (or run it manually when logs show READY).
+`gate-watch` only logs whether the gate is READY. It does **not** start downloads or orders. After **`npm start`** finishes for the day, gate-watch **stops checking** until the next calendar day. Schedule `npm start` with `mmx-pipeline.timer` (or run manually when logs show READY).
+
+**Production on Pi:** use the three systemd units in `deploy/systemd/` (install script below) — not manual `npm run` in a terminal.
 
 ---
 
@@ -127,59 +130,115 @@ npm start -- --force
 
 ---
 
-## 5. systemd — gate watch (hourly 9 AM–11 PM, pauses after daily pipeline)
+## 5. Git credentials (private repo)
 
-Create `/etc/systemd/system/mmx-gate-watch.service`:
-
-```ini
-[Unit]
-Description=Macromatix key item gate watch (hourly)
-After=network-online.target
-Wants=network-online.target
-
-[Service]
-Type=simple
-User=pi
-WorkingDirectory=/home/pi/mmx-report-automation
-EnvironmentFile=/home/pi/mmx-report-automation/.env.production
-ExecStart=/usr/bin/npm run gate-watch
-Restart=always
-RestartSec=30
-
-[Install]
-WantedBy=multi-user.target
-```
-
-Enable:
+The Pi must pull without prompts. One-time on the Pi as your user (`orbro`):
 
 ```bash
-sudo systemctl daemon-reload
-sudo systemctl enable mmx-gate-watch
-sudo systemctl start mmx-gate-watch
-journalctl -u mmx-gate-watch -f
+git config --global credential.helper store
+cd ~/mmx-report-automation
+git pull origin main   # enter GitHub username + Personal Access Token (repo scope)
 ```
+
+Credentials are saved in `~/.git-credentials`. Use a **fine-grained PAT** or classic token with **Contents: Read** on this repo only.
 
 ---
 
-## 6. systemd — full pipeline (daily timer)
+## 6. systemd — install everything (recommended)
+
+Templates live in `deploy/systemd/`. They set:
+
+- **`Restart=always`** on gate-watch — runs indefinitely; systemd restarts after crash or reboot
+- **`mmx-git-pull.timer`** — `git pull --ff-only` every **15 minutes**; restarts gate-watch when `main` changes
+- **`ExecStartPre`** on gate-watch and pipeline — pull before each start
+- **`mmx-pipeline.timer`** — daily full pipeline (default **11:00** local Pi time)
+
+### 6a. One-command install
+
+After clone, bootstrap, and `.env.production` exist:
+
+```bash
+cd ~/mmx-report-automation
+git pull origin main
+chmod +x scripts/pi-git-pull.sh deploy/systemd/install-units.sh
+./deploy/systemd/install-units.sh orbro
+```
+
+Replace `orbro` with your Linux username.
+
+### 6b. Allow gate-watch restart after git pull (no password)
+
+```bash
+cd ~/mmx-report-automation
+sed "s/MMX_USER/orbro/" deploy/systemd/mmx-sudoers | sudo tee /etc/sudoers.d/mmx-report-automation
+sudo chmod 440 /etc/sudoers.d/mmx-report-automation
+sudo visudo -cf /etc/sudoers.d/mmx-report-automation
+```
+
+Without this, pulls still work but you may need `sudo systemctl restart mmx-gate-watch` manually to load new code.
+
+### 6c. What gets enabled
+
+| Unit | Role |
+|------|------|
+| `mmx-gate-watch.service` | Always on; `Restart=always` |
+| `mmx-git-pull.timer` | Git fetch/pull every 15 min |
+| `mmx-pipeline.timer` | Daily `npm start` |
+
+Check status:
+
+```bash
+systemctl status mmx-gate-watch
+systemctl list-timers --all | grep mmx
+journalctl -u mmx-gate-watch -f
+journalctl -u mmx-git-pull.service -n 20 --no-pager
+```
+
+Change pipeline time: edit `/etc/systemd/system/mmx-pipeline.timer` (`OnCalendar`), then `sudo systemctl daemon-reload && sudo systemctl restart mmx-pipeline.timer`.
+
+Change git poll interval: edit `mmx-git-pull.timer` (`OnUnitActiveSec=15min`).
+
+### 6d. Manual unit install (optional)
+
+If you prefer not to use the install script, copy units from `deploy/systemd/` and replace `MMX_USER` / `MMX_HOME` with e.g. `orbro` and `/home/orbro`.
+
+---
+
+## 7. systemd — gate watch only (manual)
+
+<details>
+<summary>Legacy manual <code>mmx-gate-watch.service</code> snippet</summary>
+
+```ini
+[Service]
+Type=simple
+User=orbro
+WorkingDirectory=/home/orbro/mmx-report-automation
+EnvironmentFile=/home/orbro/mmx-report-automation/.env.production
+ExecStartPre=/home/orbro/mmx-report-automation/scripts/pi-git-pull.sh
+ExecStart=/usr/bin/npm run gate-watch
+Restart=always
+RestartSec=30
+```
+
+</details>
+
+---
+
+## 8. systemd — full pipeline (daily timer)
 
 The full pipeline exits immediately if it already completed today (`data/out/pipeline-complete-today.json`). Schedule one run after the store typically finishes the key item count (adjust time to your store).
 
-**Service** — `/etc/systemd/system/mmx-pipeline.service`:
+**Service** — `/etc/systemd/system/mmx-pipeline.service` (or use `deploy/systemd/mmx-pipeline.service`):
 
 ```ini
-[Unit]
-Description=Macromatix full pipeline (gate, reports, Excel, orders)
-After=network-online.target
-Wants=network-online.target
-
 [Service]
 Type=oneshot
-User=pi
-WorkingDirectory=/home/pi/mmx-report-automation
-EnvironmentFile=/home/pi/mmx-report-automation/.env.production
+User=orbro
+WorkingDirectory=/home/orbro/mmx-report-automation
+EnvironmentFile=/home/orbro/mmx-report-automation/.env.production
+ExecStartPre=/home/orbro/mmx-report-automation/scripts/pi-git-pull.sh
 ExecStart=/usr/bin/npm start
-# Allow ~15–25 min for reports + five vendor orders
 TimeoutStartSec=2400
 ```
 
@@ -226,7 +285,7 @@ npm start -- --force
 
 ---
 
-## 7. Running with live-dashboard-app on the same Pi
+## 9. Running with live-dashboard-app on the same Pi
 
 | | live-dashboard-app | mmx-report-automation |
 |---|-------------------|------------------------|
@@ -239,11 +298,15 @@ Do **not** point both apps at the same `userDataDir`.
 
 ---
 
-## 8. Useful commands
+## 10. Useful commands
 
 ```bash
 # Gate watch logs
 journalctl -u mmx-gate-watch -n 50 --no-pager
+
+# Git pull timer
+journalctl -u mmx-git-pull.service -n 30 --no-pager
+systemctl list-timers mmx-git-pull.timer
 
 # Last pipeline run
 journalctl -u mmx-pipeline.service -n 200 --no-pager
@@ -260,7 +323,7 @@ rm -f data/out/pipeline-complete-today.json
 
 ---
 
-## 9. Troubleshooting
+## 11. Troubleshooting
 
 | Symptom | What to try |
 |---------|-------------|
@@ -274,7 +337,7 @@ rm -f data/out/pipeline-complete-today.json
 
 ---
 
-## 10. Production checklist
+## 12. Production checklist
 
 - [ ] Chromium installed and `SCRAPER_EXECUTABLE_PATH` set
 - [ ] `Build To JS.xlsx` in `data/workbooks/`
@@ -283,6 +346,10 @@ rm -f data/out/pipeline-complete-today.json
 - [ ] `npm run login` + `gate-check` succeeded once
 - [ ] `npm run dry-run` produced files in `data/inbox/`
 - [ ] `npm start` completed all vendor orders once
-- [ ] `mmx-gate-watch.service` enabled
+- [ ] `./deploy/systemd/install-units.sh <user>` run
+- [ ] `mmx-gate-watch.service` enabled (Restart=always)
+- [ ] `mmx-git-pull.timer` enabled
+- [ ] `/etc/sudoers.d/mmx-report-automation` installed (optional but recommended)
 - [ ] `mmx-pipeline.timer` enabled at the right local time
+- [ ] `git pull` works non-interactively (credential.helper store + PAT)
 - [ ] Pi timezone or `MMX_TIME_ZONE` matches the store

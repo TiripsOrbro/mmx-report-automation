@@ -1,0 +1,8 @@
+# Allow the Pi user to restart gate-watch after a git pull (no password).
+# Install: sudo cp deploy/systemd/mmx-sudoers /etc/sudoers.d/mmx-report-automation
+#          sudo chmod 440 /etc/sudoers.d/mmx-report-automation
+#          sudo visudo -cf /etc/sudoers.d/mmx-report-automation
+#
+# Replace MMX_USER with your Linux username (e.g. orbro).
+
+MMX_USER ALL=(root) NOPASSWD: /bin/systemctl restart mmx-gate-watch.service
