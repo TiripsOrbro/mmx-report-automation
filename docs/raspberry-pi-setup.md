@@ -9,7 +9,7 @@ Deploy the Macromatix pipeline on a fresh Pi alongside [live-dashboard-app](http
 | **Gate watch** (always on) | `npm run gate-watch` | Hourly key-item gate check, 9 AM–11 PM store time |
 | **Full pipeline** (scheduled) | `npm start` | Gate → 3 reports → Excel → all scheduled orders (once per day) |
 
-`gate-watch` only logs whether the gate is READY. It does **not** start downloads or orders. Schedule `npm start` separately (or run it manually when logs show READY).
+`gate-watch` only logs whether the gate is READY. It does **not** start downloads or orders. After **`npm start`** finishes for the day, gate-watch **stops checking** until the next calendar day (same `data/out/pipeline-complete-today.json` lock). Schedule `npm start` separately (or run it manually when logs show READY).
 
 ---
 
@@ -127,7 +127,7 @@ npm start -- --force
 
 ---
 
-## 5. systemd — gate watch (hourly 9 AM–11 PM)
+## 5. systemd — gate watch (hourly 9 AM–11 PM, pauses after daily pipeline)
 
 Create `/etc/systemd/system/mmx-gate-watch.service`:
 

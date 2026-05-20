@@ -75,7 +75,7 @@ After all scheduled orders are updated, the browser **closes** and a daily lock 
 
 ### Hourly key-item gate check (9 AM–11 PM)
 
-Runs **gate check only** (no downloads or orders), once per hour in `MMX_TIME_ZONE` (default Australia/Melbourne):
+Runs **gate check only** (no downloads or orders), once per hour in `MMX_TIME_ZONE` (default Australia/Melbourne). After **`npm start`** completes for the day (same lock as `data/out/pipeline-complete-today.json`), gate-watch **sleeps until the next day** at `MMX_GATE_SCHEDULE_START` instead of logging in hourly.
 
 ```bash
 npm run gate-watch
@@ -114,7 +114,7 @@ Leave this running in a terminal or register it as a Windows scheduled task / se
 | `npm run reports-hub` | After gate passes, open **Report Selection → Supply Chain** (export TBD) |
 | `npm run dry-run` | Gate + download + Excel merge; skip Macromatix paste submit |
 | `npm start` | Full pipeline |
-| `npm run gate-watch` | Hourly gate check (9 AM–11 PM); Pi: run under systemd |
+| `npm run gate-watch` | Hourly gate check (9 AM–11 PM); pauses until tomorrow after full pipeline; Pi: systemd |
 
 Exit codes: `0` success or gate skipped (not ready); `1` error.
 
