@@ -328,7 +328,8 @@ rm -f data/out/pipeline-complete-today.json
 | Log message | Fix |
 |-------------|-----|
 | `Failed to load environment files: No such file or directory` | Create `.env.production` (or `.env`) in the repo — see §3 |
-| `Failed to spawn 'start-pre' task` | Run `git pull`, then `chmod +x scripts/pi-git-pull.sh`; re-run `install-units.sh` |
+| `Failed to spawn 'start-pre' task` / git pull merge error | `git status` — discard or stash local edits, then `git pull`; see below |
+| `would be overwritten by merge` on `install-units.sh` | `git checkout -- deploy/systemd/install-units.sh && git pull` |
 | Gate-watch restart loop | Fix env + script, then `sudo systemctl restart mmx-gate-watch` |
 
 

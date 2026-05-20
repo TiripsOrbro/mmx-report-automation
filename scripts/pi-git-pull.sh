@@ -33,7 +33,8 @@ fi
 
 BEFORE="$(git rev-parse HEAD)"
 git fetch "$REMOTE" "$BRANCH"
-git pull --ff-only "$REMOTE" "$BRANCH"
+# --autostash: Pi install/chmod tweaks must not block service start
+git pull --ff-only --autostash "$REMOTE" "$BRANCH"
 AFTER="$(git rev-parse HEAD)"
 
 if [ "$BEFORE" = "$AFTER" ]; then
