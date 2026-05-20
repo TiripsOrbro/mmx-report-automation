@@ -114,6 +114,7 @@ Leave this running in a terminal or register it as a Windows scheduled task / se
 | `npm run reports-hub` | After gate passes, open **Report Selection → Supply Chain** (export TBD) |
 | `npm run dry-run` | Gate + download + Excel merge; skip Macromatix paste submit |
 | `npm start` | Full pipeline |
+| `npm run gate-watch` | Hourly gate check (9 AM–11 PM); Pi: run under systemd |
 
 Exit codes: `0` success or gate skipped (not ready); `1` error.
 
@@ -125,14 +126,14 @@ Password-only login. First run can use `SCRAPER_HEADLESS=false` and `npm run log
 
 ## Scheduling
 
-Run on a separate timer from the dashboard, e.g. Windows Task Scheduler:
+**Windows** — Task Scheduler:
 
 ```
 cd Y:\Taco Bell Dashboard\mmx-report-automation
 node src\run.js
 ```
 
-On Raspberry Pi, use a separate `systemd` unit and the same `SCRAPER_EXECUTABLE_PATH` / Chromium notes as the dashboard README.
+**Raspberry Pi** — see **[docs/raspberry-pi-setup.md](docs/raspberry-pi-setup.md)** for Chromium install, `.env.production`, first-run bootstrap, `mmx-gate-watch.service`, and `mmx-pipeline.timer`.
 
 ## Project layout
 
@@ -144,7 +145,7 @@ mmx-report-automation/
     inbox/          downloaded reports (+ samples/ for testing)
     out/            backups + paste-values JSON
     browser-profile/ saved login session (gitignored)
-  docs/             discovery checklist
+  docs/             discovery checklist + raspberry-pi-setup.md
   src/
     run.js          CLI entry
     macromatix/     login, browser launch

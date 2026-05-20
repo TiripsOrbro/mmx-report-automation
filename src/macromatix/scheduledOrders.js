@@ -1,5 +1,5 @@
 /**
- * Scheduled orders list — vendor table + list date (default 2 days ahead).
+ * Scheduled orders list — vendor table + list date (default tomorrow).
  * New orders: Create link. Existing orders: Process link (still updatable, never Submit).
  */
 const { GOTO_OPTS } = require('./browser');
@@ -59,7 +59,7 @@ async function waitAfterListDateChange(page) {
 }
 
 async function setScheduledOrdersListDate(page, dateSpec) {
-    const display = resolveReportDate(dateSpec || 'daysFromNow:2', { dateOnly: true });
+    const display = resolveReportDate(dateSpec || 'daysFromNow:1', { dateOnly: true });
 
     if (await isListDateAlready(page, display)) {
         log.info(`List date already ${display} — skipping date change`);
@@ -73,7 +73,7 @@ async function setScheduledOrdersListDate(page, dateSpec) {
 }
 
 function getScheduledOrdersDateSpec(vendorOrdersCfg) {
-    return vendorOrdersCfg?.scheduledOrdersDate || process.env.MMX_ORDER_DATE || 'daysFromNow:2';
+    return vendorOrdersCfg?.scheduledOrdersDate || process.env.MMX_ORDER_DATE || 'daysFromNow:1';
 }
 
 async function applyScheduledOrdersListDate(page, vendorOrdersCfg) {
