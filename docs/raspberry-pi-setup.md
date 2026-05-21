@@ -284,81 +284,55 @@ npm start -- --force
 
 ---
 
-## 8b. PM2 (optional alternative to systemd)
+## 8b. PM2 — Automatic Orders (optional alternative to systemd)
 
-If you use PM2 instead of systemd, **do not** point it at `index.js` (that file does not exist). Use the included ecosystem file:
+If you use PM2 instead of systemd:
 
 ```bash
 cd ~/mmx-report-automation
 git pull
-npm ci
+bash scripts/pm2-setup-pi.sh
+```
 
-# Stop any broken process
-pm2 delete mmx-report 2>/dev/null || true
+This starts **`automatic-orders`** (renamed from `mmx-gate-watch`). It:
 
-# Gate watch only (recommended for always-on PM2)
-pm2 start ecosystem.config.cjs
+1. Checks the key-item gate **every hour** (9 AM–11 PM Melbourne)
+2. When gate is **READY** and today's pipeline has **not** run yet → runs the **full pipeline** (reports → Excel → vendor order forms → Update)
+3. **Auto-restarts** if the process crashes (PM2 `autorestart`)
+4. After today's pipeline completes → pauses until tomorrow
+
+**Survive Pi reboot** (run once after `pm2 save`):
+
+```bash
+pm2 startup
+# Copy/paste and run the sudo command PM2 prints, then:
 pm2 save
-pm2 logs mmx-gate-watch --lines 50
 ```
 
-The PM2 app runs **`gate-watch`** (hourly gate checks), not the full pipeline. Schedule the full pipeline separately (`npm start` via cron, systemd timer, or manual).
-
-**First-time login on the Pi:** headless SSH has no display, so `SCRAPER_HEADLESS=false` fails with “Missing X server”. You do **not** need `source .env.production` — Node loads it automatically. **Quote values with spaces** in `.env.production`:
-
-```ini
-MMX_STORE_NAME="3811 Chirnside Park"
-```
-
-Unquoted `3811 Chirnside Park` breaks bash if you run `source .env.production` (`Chirnside: command not found`).
+**Logs** (order entry details appear here when the pipeline runs):
 
 ```bash
-cd ~/mmx-report-automation
-sudo apt install -y xvfb   # one-time, for virtual display
-npm run login-pi
+pm2 logs automatic-orders --lines 100
 ```
 
-Or copy a working session from your PC:
+Example log lines during order entry:
 
-```bash
-# On PC (PowerShell) — stop mmx automation first if running
-scp -r "path/to/mmx-report-automation/data/browser-profile" orbro@AshDash:~/mmx-report-automation/data/
 ```
-
-On the Pi after copying, remove Chromium lock files from the copy:
-
-```bash
-rm -f ~/mmx-report-automation/data/browser-profile/SingletonLock \
-      ~/mmx-report-automation/data/browser-profile/SingletonSocket \
-      ~/mmx-report-automation/data/browser-profile/SingletonCookie
+Gate READY — launching automatic orders pipeline
+--- Order 1/4: Americold Vic DRY ---
+  order line: 38891 × 1 — LARGE CUPS
+  order line: 39054 × 1 — MEX SEASONING
+Order lines filled: 5/5
+Clicked "Update" only — order not submitted
+Automatic orders pipeline finished successfully
 ```
-
-**Pi `.env.production` (no scp needed)** — use the same credentials as the working dashboard and skip the saved browser profile:
-
-```ini
-MMX_USE_DASHBOARD_CREDENTIALS=true
-MMX_EPHEMERAL_BROWSER=true
-SCRAPER_EXECUTABLE_PATH=/usr/bin/chromium
-MMX_STORE_NAME="3811 Chirnside Park"
-```
-
-Remove or comment out duplicate `SCRAPER_USERNAME` / `SCRAPER_PASSWORD` in mmx `.env.production` if they are wrong — dashboard `.env.production` will be used instead.
-
-Verify:
-
-```bash
-npm run check-creds
-npm run gate-check
-```
-
-Then PM2 headless runs should log `Session already active (userDataDir)` or `Logged in to Macromatix` each run.
 
 **Before manual `npm run gate-check`**, stop PM2 if using a saved profile (not needed with `MMX_EPHEMERAL_BROWSER=true`):
 
 ```bash
-pm2 stop mmx-gate-watch
+pm2 stop automatic-orders
 npm run gate-check
-pm2 start mmx-gate-watch
+pm2 start automatic-orders
 ```
 
 **If `git pull` fails** (`local changes to package.json`) or `npm ci` installs Puppeteer 25 (needs Node 22):

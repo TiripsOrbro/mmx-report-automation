@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 /**
- * Hourly key-item gate checks between 9:00 and 23:00 (store timezone).
- * Does not run the full pipeline — only `npm run gate-check`.
- * After today's full pipeline completes (daily lock), sleeps until the next day.
+ * Automatic Orders — hourly gate checks (9 AM–11 PM store time).
+ * When the key-item gate is READY and today's pipeline has not run yet,
+ * starts the full pipeline (reports → Excel → vendor order entry).
  *
- *   npm run gate-watch
+ *   npm run automatic-orders
  *
  * Env: MMX_GATE_SCHEDULE_START=9, MMX_GATE_SCHEDULE_END=23, MMX_TIME_ZONE=Australia/Melbourne
  */
@@ -17,6 +17,7 @@ const log = require('./utils/logging');
 const TZ = process.env.MMX_TIME_ZONE || process.env.DASHBOARD_TIME_ZONE || 'Australia/Melbourne';
 const START_HOUR = Number(process.env.MMX_GATE_SCHEDULE_START ?? 9);
 const END_HOUR = Number(process.env.MMX_GATE_SCHEDULE_END ?? 23);
+const GATE_READY_EXIT = 10;
 
 function localHourMinute(now = new Date()) {
     const parts = new Intl.DateTimeFormat('en-US', {
@@ -70,26 +71,56 @@ async function sleepUntilNextGateSession(workDir) {
     const wait = msUntilNextGateSession(workDir, { timeZone: TZ, startHour: START_HOUR });
     if (wait == null) return false;
     log.info(
-        `Full pipeline already completed today — gate watch paused until tomorrow (~${formatMs(wait)}, resume ~${formatResumeTime(wait)})`
+        `Automatic orders already completed today — paused until tomorrow (~${formatMs(wait)}, resume ~${formatResumeTime(wait)})`
     );
     await sleep(wait);
     return true;
 }
 
-function runGateCheck() {
+function spawnNode(args, label) {
     return new Promise((resolve) => {
-        log.info('Running scheduled gate check…');
-        const child = spawn(process.execPath, [path.join(ROOT, 'src/run.js'), '--gate-only'], {
+        log.info(`Starting ${label}…`);
+        const child = spawn(process.execPath, args, {
             cwd: ROOT,
             stdio: 'inherit',
             env: { ...process.env, MMX_KEEP_BROWSER_OPEN: 'false' },
         });
         child.on('exit', (code) => resolve(code ?? 1));
         child.on('error', (err) => {
-            log.error(err.message);
+            log.error(`${label} failed to start: ${err.message}`);
             resolve(1);
         });
     });
+}
+
+function runGateCheck() {
+    return spawnNode([path.join(ROOT, 'src/run.js'), '--gate-only'], 'gate check');
+}
+
+function runFullPipeline() {
+    return spawnNode([path.join(ROOT, 'src/run.js')], 'full pipeline (reports → Excel → vendor orders)');
+}
+
+async function maybeRunPipelineAfterGate(workDir, gateExitCode) {
+    if (gateExitCode !== GATE_READY_EXIT) {
+        if (gateExitCode === 0) {
+            log.info('Gate not ready yet — will check again next hour');
+        } else {
+            log.warn(`Gate check exited with code ${gateExitCode}`);
+        }
+        return;
+    }
+    if (isPipelineDoneToday(workDir)) {
+        log.info('Gate ready but pipeline already completed today — skipping');
+        return;
+    }
+    log.info('Gate READY — launching automatic orders pipeline');
+    const pipelineCode = await runFullPipeline();
+    if (pipelineCode === 0) {
+        log.info('Automatic orders pipeline finished successfully');
+    } else {
+        log.warn(`Automatic orders pipeline exited with code ${pipelineCode} — will retry on a later gate check`);
+    }
 }
 
 async function sleep(ms) {
@@ -99,15 +130,16 @@ async function sleep(ms) {
 async function main() {
     const { workDir } = getSettings();
     log.info(
-        `Gate watch: hourly ${START_HOUR}:00–${END_HOUR}:59 (${TZ}). Pauses after today's full pipeline (npm start).`
+        `Automatic Orders: hourly gate checks ${START_HOUR}:00–${END_HOUR}:59 (${TZ}); runs full pipeline when gate is READY (once per day).`
     );
 
     if (await sleepUntilNextGateSession(workDir)) {
         // resumed next day
     } else if (isWithinWindow()) {
-        const { hour, minute } = localHourMinute();
+        const { minute } = localHourMinute();
         if (minute < 5) {
-            await runGateCheck();
+            const gateCode = await runGateCheck();
+            await maybeRunPipelineAfterGate(workDir, gateCode);
         }
     }
 
@@ -131,7 +163,8 @@ async function main() {
             continue;
         }
 
-        await runGateCheck();
+        const gateCode = await runGateCheck();
+        await maybeRunPipelineAfterGate(workDir, gateCode);
     }
 }
 

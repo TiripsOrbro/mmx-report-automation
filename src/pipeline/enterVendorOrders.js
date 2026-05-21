@@ -308,6 +308,10 @@ function buildOrderQueue(parsed, vendorOrdersCfg, excelByVendorId, { vendorIdFil
 
 async function processOneVendorOrder(page, settings, vendor, lines) {
     log.info(`${vendor.label}: ${lines.length} line(s) (qty from column K, codes from column L)`);
+    for (const line of lines) {
+        const name = line.itemName ? ` — ${line.itemName}` : '';
+        log.info(`  order line: ${line.itemCode} × ${line.quantity}${name}`);
+    }
 
     await clickCreateForVendorRow(page, vendor);
     await waitForOrderItemsGrid(page);

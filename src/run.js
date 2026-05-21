@@ -138,7 +138,8 @@ async function main() {
             log.info(gateOk ? 'Gate check: READY — downloads would run next.' : 'Gate check: NOT READY');
             await browser.close().catch(() => {});
             browser = null;
-            process.exit(gateOk ? 0 : 0);
+            // Exit 10 = gate ready (used by automatic-orders scheduler). 0 = not ready. 1 = error.
+            process.exit(gateOk ? 10 : 0);
         }
 
         if (!gateOk) {

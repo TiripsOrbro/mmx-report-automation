@@ -1,10 +1,9 @@
 /**
- * PM2 config for Raspberry Pi (optional alternative to systemd).
+ * PM2 — Automatic Orders (gate watch + full pipeline when ready).
  *
  *   pm2 start ecosystem.config.cjs
  *   pm2 save
- *
- * Requires .env.production (or .env) in repo root with SCRAPER_* and MMX_* vars.
+ *   pm2 startup   # follow the printed command so it survives Pi reboot
  */
 const path = require('path');
 const fs = require('fs');
@@ -42,13 +41,16 @@ const env = {
 module.exports = {
     apps: [
         {
-            name: 'mmx-gate-watch',
+            name: 'automatic-orders',
             cwd: ROOT,
             script: 'src/runGateScheduler.js',
             interpreter: 'node',
             autorestart: true,
-            max_restarts: 20,
-            restart_delay: 30000,
+            max_restarts: 100,
+            min_uptime: '10s',
+            restart_delay: 15000,
+            exp_backoff_restart_delay: 1000,
+            kill_timeout: 60000,
             env,
         },
     ],
