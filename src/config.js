@@ -70,6 +70,11 @@ function getSettings() {
     const workDir = path.resolve(ROOT, process.env.MMX_WORK_DIR || './data');
     const ephemeralBrowser = /^(1|true|yes|on)$/i.test(String(process.env.MMX_EPHEMERAL_BROWSER ?? '').trim());
     const userDataDirRaw = String(process.env.MMX_USER_DATA_DIR ?? '').trim();
+    const userDataDir = ephemeralBrowser
+        ? null
+        : userDataDirRaw
+          ? path.resolve(ROOT, userDataDirRaw)
+          : path.resolve(workDir, 'browser-profile');
     return {
         root: ROOT,
         workDir,
