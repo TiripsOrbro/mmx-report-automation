@@ -67,6 +67,26 @@ function archiveFile(filePath, archiveDir) {
     return dest;
 }
 
+const CHROME_PROFILE_LOCK_FILES = ['SingletonLock', 'SingletonSocket', 'SingletonCookie'];
+
+/** Remove stale Chromium lock files (e.g. after crash, scp copy, or interrupted login). */
+function clearChromeProfileSingletonLocks(userDataDir) {
+    if (!userDataDir) return [];
+    const removed = [];
+    for (const name of CHROME_PROFILE_LOCK_FILES) {
+        const lockPath = path.join(userDataDir, name);
+        try {
+            if (fs.existsSync(lockPath)) {
+                fs.unlinkSync(lockPath);
+                removed.push(name);
+            }
+        } catch {
+            /* profile may be in use by another live Chromium */
+        }
+    }
+    return removed;
+}
+
 module.exports = {
     ensureDir,
     copyFileSafe,
@@ -75,4 +95,5 @@ module.exports = {
     waitForNewDownload,
     sleep,
     archiveFile,
+    clearChromeProfileSingletonLocks,
 };

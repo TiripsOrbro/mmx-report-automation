@@ -325,6 +325,22 @@ Or copy a working session from your PC:
 scp -r "path/to/mmx-report-automation/data/browser-profile" orbro@AshDash:~/mmx-report-automation/data/
 ```
 
+On the Pi after copying, remove Chromium lock files from the copy:
+
+```bash
+rm -f ~/mmx-report-automation/data/browser-profile/SingletonLock \
+      ~/mmx-report-automation/data/browser-profile/SingletonSocket \
+      ~/mmx-report-automation/data/browser-profile/SingletonCookie
+```
+
+**Before manual `npm run gate-check`**, stop PM2 so two processes do not share the profile:
+
+```bash
+pm2 stop mmx-gate-watch
+npm run gate-check
+pm2 start mmx-gate-watch
+```
+
 Then PM2 headless runs should log `Session already active (userDataDir)`.
 
 **If `git pull` fails** (`local changes to package.json`) or `npm ci` installs Puppeteer 25 (needs Node 22):

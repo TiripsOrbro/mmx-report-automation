@@ -2,6 +2,7 @@ const crypto = require('crypto');
 const puppeteer = require('puppeteer');
 const { BASE_URL, GOTO_OPTS, getPuppeteerLaunchOptions } = require('./browser');
 const { patchPageWaitForTimeout } = require('../utils/delay');
+const { clearChromeProfileSingletonLocks } = require('../utils/files');
 const log = require('../utils/logging');
 
 function decryptCredentialPayload(encryptedPayload, keyText) {
@@ -181,6 +182,10 @@ async function loginMacromatix(page, options = {}) {
 
 async function launchBrowser(settings) {
     const launchOpts = getPuppeteerLaunchOptions(settings.userDataDir);
+    const clearedLocks = clearChromeProfileSingletonLocks(settings.userDataDir);
+    if (clearedLocks.length) {
+        log.info(`Cleared stale browser profile locks: ${clearedLocks.join(', ')}`);
+    }
     log.info(`Launching browser (headless=${launchOpts.headless}, profile=${settings.userDataDir})`);
     const browser = await puppeteer.launch(launchOpts);
     const page = patchPageWaitForTimeout(await browser.newPage());
