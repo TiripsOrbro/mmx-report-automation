@@ -7,6 +7,7 @@
     "setup": "node scripts/setup-config.js",
     "start": "node src/run.js",
     "login": "node src/run.js --login-only",
+    "login-pi": "bash scripts/pi-login.sh",
     "gate-check": "node src/run.js --gate-only",
     "gate-watch": "node src/runGateScheduler.js",
     "reports-hub": "node src/run.js --reports-hub",

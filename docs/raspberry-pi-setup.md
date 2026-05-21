@@ -279,7 +279,6 @@ Force another run the same day:
 
 ```bash
 cd ~/mmx-report-automation
-set -a && source .env.production && set +a
 npm start -- --force
 ```
 
@@ -305,15 +304,28 @@ pm2 logs mmx-gate-watch --lines 50
 
 The PM2 app runs **`gate-watch`** (hourly gate checks), not the full pipeline. Schedule the full pipeline separately (`npm start` via cron, systemd timer, or manual).
 
-**First-time login on the Pi:** headless login often hangs if the browser profile has no saved session. Run once interactively (SSH + desktop, or VNC):
+**First-time login on the Pi:** headless SSH has no display, so `SCRAPER_HEADLESS=false` fails with “Missing X server”. You do **not** need `source .env.production` — Node loads it automatically. **Quote values with spaces** in `.env.production`:
+
+```ini
+MMX_STORE_NAME="3811 Chirnside Park"
+```
+
+Unquoted `3811 Chirnside Park` breaks bash if you run `source .env.production` (`Chirnside: command not found`).
 
 ```bash
 cd ~/mmx-report-automation
-set -a && source .env.production && set +a
-SCRAPER_HEADLESS=false npm run login
+sudo apt install -y xvfb   # one-time, for virtual display
+npm run login-pi
 ```
 
-That saves cookies in `data/browser-profile`. After that, PM2 headless runs should skip password entry.
+Or copy a working session from your PC:
+
+```bash
+# On PC (PowerShell) — stop mmx automation first if running
+scp -r "path/to/mmx-report-automation/data/browser-profile" orbro@AshDash:~/mmx-report-automation/data/
+```
+
+Then PM2 headless runs should log `Session already active (userDataDir)`.
 
 ---
 
