@@ -212,8 +212,10 @@ async function main() {
         }
 
         if (!Object.keys(reportPaths).length) {
-            log.info('No report files downloaded (configure export steps in pipeline.json).');
-            process.exit(0);
+            log.error(
+                'No report files downloaded — check config/pipeline.json on this machine (copy from your PC; it is not in git).'
+            );
+            process.exit(1);
         }
 
         const excelResult = await runExcelTransform(settings, reportPaths);
