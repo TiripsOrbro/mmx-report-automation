@@ -25,6 +25,7 @@ const { uploadToMacromatix } = require('./pipeline/uploadToMacromatix');
 const { runVendorOrderEntry } = require('./pipeline/enterVendorOrders');
 const { ensureDir, archiveFile } = require('./utils/files');
 const { isPipelineDoneToday, markPipelineDoneToday } = require('./utils/dailyLock');
+const { shouldSignalOrdersReady, signalOrdersReadyForReview } = require('./utils/ordersReadySignal');
 const log = require('./utils/logging');
 
 const args = new Set(process.argv.slice(2));
@@ -38,6 +39,24 @@ const downloadInventoryEvent = args.has('--download-inventory-event');
 const dryRun = args.has('--dry-run');
 const ordersOnly = args.has('--orders-only');
 const keepBrowserOpen = !/^(0|false|no|off)$/i.test(String(process.env.MMX_KEEP_BROWSER_OPEN ?? '').trim());
+
+function notifyDashboardOrdersReady(orderResult) {
+    const orderCount = orderResult.processed?.length ?? 1;
+    const ordersOk = orderResult.processed?.filter((p) => p.ok).length ?? orderCount;
+    if (!shouldSignalOrdersReady(ordersOk, orderCount)) {
+        if (ordersOk < orderCount) {
+            log.warn('Not notifying dashboard — some orders failed');
+        }
+        return { ordersOk, orderCount };
+    }
+    try {
+        const signalPath = signalOrdersReadyForReview({ ordersOk, ordersTotal: orderCount });
+        log.info(`Notified sales dashboard: orders ready for review (${signalPath})`);
+    } catch (err) {
+        log.warn(`Could not notify sales dashboard: ${err.message}`);
+    }
+    return { ordersOk, orderCount };
+}
 
 function isFullPipelineRun() {
     return (
@@ -112,6 +131,7 @@ async function main() {
             } else {
                 log.info('Orders-only complete:', result.vendor?.label, `${result.lines?.length ?? 0} lines`);
             }
+            notifyDashboardOrdersReady(result);
             if (keepBrowserOpen) {
                 log.info('Browser left open — press Ctrl+C to exit.');
                 browser = null;
@@ -222,8 +242,7 @@ async function main() {
             );
         }
 
-        const orderCount = orderResult.processed?.length ?? 1;
-        const ordersOk = orderResult.processed?.filter((p) => p.ok).length ?? orderCount;
+        const { ordersOk, orderCount } = notifyDashboardOrdersReady(orderResult);
         markPipelineDoneToday(settings.workDir, {
             ordersOk,
             ordersTotal: orderCount,
