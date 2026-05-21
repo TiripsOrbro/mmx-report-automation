@@ -40,11 +40,63 @@ async function setGroupDropdown(page, groupName) {
 
     if (!set) throw new Error(`Group dropdown: could not select "${groupName}"`);
     log.info(`Group set to: ${set}`);
-    await page.waitForTimeout(1500);
+    const settleMs = Number(process.env.MMX_REPORT_GROUP_SETTLE_MS || 3000);
+    await page.waitForTimeout(settleMs);
+}
+
+async function listReportOptions(page, opts = {}) {
+    const loose = Boolean(opts.loose);
+    return page.evaluate((looseMode) => {
+        const out = [];
+        for (const sel of document.querySelectorAll('select')) {
+            const label = ((sel.closest('tr, td') || sel).innerText || '').slice(0, 120);
+            const hasInventory = Array.from(sel.options).some((o) => /inventory|special event/i.test(o.text));
+            const hasScm = Array.from(sel.options).some((o) => /scm|items on/i.test(o.text));
+            if (!looseMode && !label.toLowerCase().includes('report') && !hasScm) continue;
+            if (looseMode && !label.toLowerCase().includes('report') && !hasInventory && !hasScm) continue;
+            const options = Array.from(sel.options)
+                .map((o) => (o.textContent || '').trim())
+                .filter(Boolean);
+            if (options.length) out.push({ label, options: options.slice(0, 12) });
+        }
+        return out;
+    }, loose);
+}
+
+async function waitForReportInList(page, reportName, opts = {}) {
+    const loose = Boolean(opts.loose);
+    const timeoutMs = Number(process.env.MMX_REPORT_LIST_WAIT_MS || 25000);
+    try {
+        await page.waitForFunction(
+            (name, looseMode) => {
+                const want = name.toLowerCase();
+                for (const sel of document.querySelectorAll('select')) {
+                    const label = ((sel.closest('tr, td') || sel).innerText || '').toLowerCase();
+                    const hasInventory = Array.from(sel.options).some((o) => /inventory|special event/i.test(o.text));
+                    const hasScm = Array.from(sel.options).some((o) => /scm|items on/i.test(o.text));
+                    if (!looseMode && !label.includes('report') && !hasScm) continue;
+                    if (looseMode && !label.includes('report') && !hasInventory && !hasScm) continue;
+                    for (const opt of sel.options) {
+                        const t = (opt.textContent || '').trim();
+                        if (t.toLowerCase().includes(want) || want.includes(t.toLowerCase())) return true;
+                    }
+                }
+                return false;
+            },
+            { timeout: timeoutMs },
+            reportName,
+            loose
+        );
+    } catch (err) {
+        const lists = await listReportOptions(page, opts).catch(() => []);
+        log.warn(`Report list never showed "${reportName}" (${timeoutMs}ms). Visible lists:`, JSON.stringify(lists));
+        throw err;
+    }
 }
 
 async function selectReportInList(page, reportName, opts = {}) {
     const loose = Boolean(opts.loose);
+    await waitForReportInList(page, reportName, opts);
     const picked = await page.evaluate(
         (name, looseMode) => {
         const want = name.toLowerCase();
@@ -81,7 +133,11 @@ async function selectReportInList(page, reportName, opts = {}) {
         loose
     );
 
-    if (!picked) throw new Error(`Reports list: could not select "${reportName}"`);
+    if (!picked) {
+        const lists = await listReportOptions(page, opts).catch(() => []);
+        log.warn(`Reports list: could not select "${reportName}". Visible lists:`, JSON.stringify(lists));
+        throw new Error(`Reports list: could not select "${reportName}"`);
+    }
     log.info(`Report selected: ${picked}`);
     await page.waitForTimeout(2000);
 }
