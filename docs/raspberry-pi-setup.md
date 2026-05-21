@@ -327,6 +327,20 @@ scp -r "path/to/mmx-report-automation/data/browser-profile" orbro@AshDash:~/mmx-
 
 Then PM2 headless runs should log `Session already active (userDataDir)`.
 
+**If `git pull` fails** (`local changes to package.json`) or `npm ci` installs Puppeteer 25 (needs Node 22):
+
+```bash
+cd ~/mmx-report-automation
+git checkout -- package.json package-lock.json
+git pull
+rm -rf node_modules
+npm ci
+node -e "console.log('puppeteer', require('puppeteer/package.json').version)"
+# Must print puppeteer 10.4.0 — not 25.x
+```
+
+Never run bare `npm install` on the Pi (it can upgrade Puppeteer). Always `npm ci` after `git pull`.
+
 ---
 
 ## 9. Running with live-dashboard-app on the same Pi
