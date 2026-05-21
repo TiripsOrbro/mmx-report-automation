@@ -6,7 +6,7 @@
  *   npm run orders-test                    # all openable scheduled orders (top → bottom)
  *   npm run orders-test -- --vendor bega   # one vendor only
  *
- * Uses scheduled orders date from config (e.g. daysFromNow:2). Update only — never Submit.
+ * Uses scheduled orders date from config (default tomorrow). Update only — never Submit.
  */
 const { getSettings, loadJson } = require('./config');
 const { launchBrowser, loginMacromatix } = require('./macromatix/auth');

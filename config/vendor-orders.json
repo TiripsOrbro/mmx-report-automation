@@ -1,7 +1,7 @@
 {
   "_comment": "Excel tabs + Macromatix scheduled-order rows. orderClass matches Class (DRY/FRG/FRZ). Without --vendor, npm run orders-test processes every Create/Process row top-to-bottom, returning to the list after each Update.",
   "scheduledOrdersUrl": "https://tacobellau.macromatix.net/mms_stores_scheduledorders.aspx",
-  "scheduledOrdersDate": "daysFromNow:2",
+  "scheduledOrdersDate": "tomorrow",
   "excel": {
     "itemCodeColumn": "L",
     "quantityColumn": "K",

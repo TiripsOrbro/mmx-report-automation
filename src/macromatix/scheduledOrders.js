@@ -73,7 +73,7 @@ async function setScheduledOrdersListDate(page, dateSpec) {
 }
 
 function getScheduledOrdersDateSpec(vendorOrdersCfg) {
-    return vendorOrdersCfg?.scheduledOrdersDate || process.env.MMX_ORDER_DATE || 'daysFromNow:1';
+    return vendorOrdersCfg?.scheduledOrdersDate || process.env.MMX_ORDER_DATE || 'tomorrow';
 }
 
 async function applyScheduledOrdersListDate(page, vendorOrdersCfg) {

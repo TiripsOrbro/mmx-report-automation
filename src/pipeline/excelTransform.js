@@ -3,6 +3,7 @@ const path = require('path');
 const ExcelJS = require('exceljs');
 const { copyFileSafe, ensureDir } = require('../utils/files');
 const log = require('../utils/logging');
+const { recalcWorkbook } = require('../utils/recalcWorkbook');
 const {
     loadSourceWorkbook,
     resolveSourceSheet,
@@ -163,6 +164,13 @@ async function runExcelTransform(settings, reportPaths) {
     await applyMapping(wb, reportPaths, settings.excelMapping);
     await wb.xlsx.writeFile(templatePath);
     log.info(`Updated working template: ${templatePath}`);
+
+    const recalc = recalcWorkbook(templatePath);
+    if (recalc.ok) {
+        await wb.xlsx.readFile(templatePath);
+    } else if (!recalc.skipped) {
+        log.warn('Workbook recalc did not run — vendor order quantities may be stale');
+    }
 
     const syncedPaths = getTemplateSyncPaths(settings).length
         ? syncTemplateCopies(templatePath, settings)
