@@ -1,6 +1,7 @@
 const crypto = require('crypto');
 const puppeteer = require('puppeteer');
 const { BASE_URL, GOTO_OPTS, getPuppeteerLaunchOptions } = require('./browser');
+const { patchPageWaitForTimeout } = require('../utils/delay');
 const log = require('../utils/logging');
 
 function decryptCredentialPayload(encryptedPayload, keyText) {
@@ -126,7 +127,7 @@ async function launchBrowser(settings) {
     const launchOpts = getPuppeteerLaunchOptions(settings.userDataDir);
     log.info(`Launching browser (headless=${launchOpts.headless}, profile=${settings.userDataDir})`);
     const browser = await puppeteer.launch(launchOpts);
-    const page = await browser.newPage();
+    const page = patchPageWaitForTimeout(await browser.newPage());
     await page.setViewport({ width: 1280, height: 720 });
     return { browser, page };
 }
