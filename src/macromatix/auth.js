@@ -46,6 +46,75 @@ function isMacromatixLogonPage(url, hasLoginForm) {
     return /\/MMS_Logon\.aspx/i.test(url || '') || /\/login/i.test(url || '');
 }
 
+async function readLoginPageError(page) {
+    try {
+        return await page.evaluate(() => {
+            const selectors = [
+                '.validation-summary-errors',
+                '#Login_FailureText',
+                '[id*="Failure"]',
+                '[id*="Error"]',
+                '.error',
+            ];
+            for (const sel of selectors) {
+                const el = document.querySelector(sel);
+                const text = (el?.innerText || el?.textContent || '').replace(/\s+/g, ' ').trim();
+                if (text) return text.slice(0, 240);
+            }
+            return '';
+        });
+    } catch {
+        return '';
+    }
+}
+
+async function submitLoginForm(page, username, password, navTimeout) {
+    await page.waitForSelector('#Login_UserName', { timeout: navTimeout });
+    await page.evaluate(
+        (user, pass) => {
+            const u = document.querySelector('#Login_UserName');
+            const p = document.querySelector('#Login_Password');
+            if (!u || !p) throw new Error('Login fields not found');
+            u.focus();
+            u.value = user;
+            p.value = pass;
+            for (const el of [u, p]) {
+                el.dispatchEvent(new Event('input', { bubbles: true }));
+                el.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+        },
+        username,
+        password
+    );
+
+    const submitLabel = await page.evaluate(() => {
+        const btn =
+            document.querySelector('#Login_LoginButton') ||
+            document.querySelector('input[type="submit"]') ||
+            document.querySelector('button[type="submit"]');
+        if (btn) {
+            btn.click();
+            return btn.value || btn.textContent || btn.id || 'submit';
+        }
+        const form = document.querySelector('form');
+        if (form) {
+            form.submit();
+            return 'form.submit';
+        }
+        return null;
+    });
+    if (!submitLabel) throw new Error('Login button not found');
+
+    log.info(`Login submit clicked (${String(submitLabel).trim().slice(0, 40)})`);
+    await Promise.race([
+        page.waitForNavigation({ waitUntil: 'networkidle2', timeout: navTimeout }).catch(() => {}),
+        page
+            .waitForFunction(() => !/\/MMS_Logon\.aspx/i.test(location.href), { timeout: navTimeout })
+            .catch(() => {}),
+        page.waitForTimeout(4000),
+    ]);
+}
+
 async function waitForPostLogin(page, loginSuccessUrlPart, loginWaitMs) {
     const needle = String(loginSuccessUrlPart || 'MMS_Stores').replace(/^\//, '');
     const start = Date.now();
@@ -63,8 +132,11 @@ async function waitForPostLogin(page, loginSuccessUrlPart, loginWaitMs) {
 
         if (Date.now() - lastLogAt >= 15000) {
             const onLoginPage = isMacromatixLogonPage(url, Boolean(onLogin));
+            const loginError = onLoginPage ? await readLoginPageError(page) : '';
             log.info(
-                `Waiting for login… (${Math.round((Date.now() - start) / 1000)}s) url=${url.slice(0, 80)} onLoginPage=${onLoginPage}`
+                `Waiting for login… (${Math.round((Date.now() - start) / 1000)}s) url=${url.slice(0, 80)} onLoginPage=${onLoginPage}${
+                    loginError ? ` error="${loginError}"` : ''
+                }`
             );
             lastLogAt = Date.now();
         }
@@ -105,35 +177,24 @@ async function loginMacromatix(page, options = {}) {
         return;
     }
 
-    log.info('Entering credentials…');
-    await page.waitForSelector('#Login_UserName', { timeout: navTimeout });
-    await page.evaluate(() => {
-        const u = document.querySelector('#Login_UserName');
-        const p = document.querySelector('#Login_Password');
-        if (u) u.value = '';
-        if (p) p.value = '';
-    });
-    await page.type('#Login_UserName', username, { delay: 20 });
-    await page.type('#Login_Password', password, { delay: 20 });
-
-    const loginButton = await page.$('input[type="submit"]');
-    if (!loginButton) throw new Error('Login button not found');
-    await Promise.all([
-        page.waitForNavigation({ waitUntil: 'load', timeout: navTimeout }).catch(() => {}),
-        loginButton.click(),
-    ]);
+    log.info(`Entering credentials for user "${username}"…`);
+    await submitLoginForm(page, username, password, navTimeout);
 
     log.info('Credentials submitted — waiting for Macromatix session…');
     const ok = await waitForPostLogin(page, loginSuccessUrlPart, loginWaitMs);
     if (!ok) {
+        const loginError = await readLoginPageError(page);
         let hint = '';
         try {
-            hint = ` Last url: ${page.url()}`;
+            hint = ` Last url: ${page.url()}.`;
         } catch {
             /* ignore */
         }
+        if (loginError) {
+            hint += ` Login page message: ${loginError}`;
+        }
         throw new Error(
-            `Login did not complete within ${loginWaitMs}ms.${hint} Run \`npm run login\` once on the Pi (SCRAPER_HEADLESS=false) to save a session in userDataDir, then retry.`
+            `Login did not complete within ${loginWaitMs}ms.${hint} Check SCRAPER_USERNAME/SCRAPER_PASSWORD in .env.production, or copy data/browser-profile from your PC.`
         );
     }
     log.info('Logged in to Macromatix');
