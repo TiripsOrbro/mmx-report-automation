@@ -24,7 +24,7 @@ Config: `gate.countTypeText`, `gate.appliedStatusText`. Check: `npm run gate-che
 | Stock On Hand | **SCM - Items On Hand (Flat)** |
 | Stock On Order | **SCM - Items On Order (Flat)** |
 | Format | **Excel Data Only** |
-| Start date (On Hand) | **Last week Monday** (`startDate: "lastWeekMonday"`, Melbourne TZ) |
+| Start date (On Hand) | **Tomorrow** (`startDate: "tomorrow"`, Melbourne TZ) |
 | Start / End (On Order) | **7 days ago** / **21 days from now** (`daysAgo:7`, `daysFromNow:21`, `dateOnly: true`) |
 | Store | **Chirnside Park** (default) |
 

@@ -12,14 +12,14 @@ async function loadSourceWorkbook(filePath) {
         const wb = XLSX.readFile(filePath, { type: 'file', raw: false });
         const sheetName = wb.SheetNames[0];
         const sheet = wb.Sheets[sheetName];
-        const grid = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: null, raw: false });
+        const grid = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: null, raw: true });
         return { type: 'grid', name: sheetName, grid, sheetNames: wb.SheetNames };
     }
     if (ext === '.xls') {
         const wb = XLSX.readFile(filePath, { cellDates: true });
         const sheetName = wb.SheetNames[0];
         const sheet = wb.Sheets[sheetName];
-        const grid = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: null, raw: false });
+        const grid = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: null, raw: true });
         return { type: 'grid', name: sheetName, grid, sheetNames: wb.SheetNames };
     }
 
@@ -49,14 +49,45 @@ function resolveSourceSheet(source, sheetName) {
 }
 
 function getSourceCell(sourceSheet, row, col) {
+    let val;
     if (sourceSheet.type === 'grid') {
         const r = sourceSheet.grid[row - 1];
         if (!r) return null;
-        return r[col - 1] ?? null;
+        val = r[col - 1] ?? null;
+    } else {
+        val = sourceSheet.ws.getCell(row, col).value;
+        if (val && typeof val === 'object' && val.result !== undefined) val = val.result;
+        else if (val && typeof val === 'object' && val.text) val = val.text;
     }
-    const val = sourceSheet.ws.getCell(row, col).value;
-    if (val && typeof val === 'object' && val.result !== undefined) return val.result;
-    if (val && typeof val === 'object' && val.text) return val.text;
+    return normalizePasteCellValue(val);
+}
+
+/**
+ * Coerce report values to Excel-friendly types so pasted cells stay numeric (no leading ' text prefix).
+ */
+function normalizePasteCellValue(val) {
+    if (val == null || val === '') return null;
+    if (val instanceof Date) return val;
+    if (typeof val === 'number' && Number.isFinite(val)) return val;
+    if (typeof val === 'boolean') return val;
+
+    if (typeof val === 'string') {
+        let s = val.trim();
+        if (s.startsWith("'")) s = s.slice(1).trim();
+        if (s === '') return null;
+
+        const plainNum = /^-?(?:\d+\.?\d*|\.\d+)$/;
+        if (plainNum.test(s)) return Number(s);
+
+        const currencyNum = /^\$?\s*-?(?:\d{1,3}(?:,\d{3})*|\d+)(?:\.\d+)?$/;
+        if (currencyNum.test(s)) {
+            const n = Number(s.replace(/[$,\s]/g, ''));
+            if (Number.isFinite(n)) return n;
+        }
+
+        return s;
+    }
+
     return val;
 }
 
@@ -123,6 +154,7 @@ module.exports = {
     loadSourceWorkbook,
     resolveSourceSheet,
     getSourceCell,
+    normalizePasteCellValue,
     resolveSourceRange,
     parseCellRef,
     colLettersToNum,
