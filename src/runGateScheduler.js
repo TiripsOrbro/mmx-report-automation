@@ -1,13 +1,13 @@
 #!/usr/bin/env node
 /**
- * Automatic Orders — scheduled gate checks (9 AM–11 PM store time).
+ * Automatic Orders — scheduled gate checks (8 AM–before 11 PM store time).
  * When the key-item gate is READY and today's pipeline has not run yet,
- * starts the full pipeline (reports → Excel → vendor order entry).
+ * starts the full pipeline (reports → Excel → vendor order entry) once per day.
  *
  *   npm run automatic-orders
  *
- * Env: MMX_GATE_SCHEDULE_START=9, MMX_GATE_SCHEDULE_END=23, MMX_TIME_ZONE=Australia/Melbourne
- *      MMX_GATE_CHECK_INTERVAL_MINUTES=60  (use 15 for testing)
+ * Env: MMX_GATE_SCHEDULE_START=8, MMX_GATE_SCHEDULE_END=23 (exclusive — dormant from 11 PM),
+ *      MMX_GATE_CHECK_INTERVAL_MINUTES=15, MMX_TIME_ZONE=Australia/Melbourne
  */
 const path = require('path');
 const { spawn } = require('child_process');
@@ -16,11 +16,12 @@ const { isPipelineDoneToday, msUntilNextGateSession } = require('./utils/dailyLo
 const log = require('./utils/logging');
 
 const TZ = process.env.MMX_TIME_ZONE || process.env.DASHBOARD_TIME_ZONE || 'Australia/Melbourne';
-const START_HOUR = Number(process.env.MMX_GATE_SCHEDULE_START ?? 9);
+const START_HOUR = Number(process.env.MMX_GATE_SCHEDULE_START ?? 8);
+/** First hour when dormant (exclusive). 23 = active through 10:59 PM, dormant from 11 PM. */
 const END_HOUR = Number(process.env.MMX_GATE_SCHEDULE_END ?? 23);
 const CHECK_INTERVAL_MINUTES = Math.min(
     60,
-    Math.max(1, Number(process.env.MMX_GATE_CHECK_INTERVAL_MINUTES ?? 60) || 60)
+    Math.max(1, Number(process.env.MMX_GATE_CHECK_INTERVAL_MINUTES ?? 15) || 15)
 );
 const GATE_READY_EXIT = 10;
 
@@ -37,35 +38,52 @@ function localHourMinute(now = new Date()) {
 
 function isWithinWindow(now = new Date()) {
     const { hour } = localHourMinute(now);
-    return hour >= START_HOUR && hour <= END_HOUR;
+    return hour >= START_HOUR && hour < END_HOUR;
 }
 
-function msUntilNextScheduledCheck(now = new Date()) {
+function msUntilLocalHour(targetHour, now = new Date()) {
     const { hour, minute } = localHourMinute(now);
     const msIntoMinute = now.getSeconds() * 1000 + now.getMilliseconds();
+    if (hour < targetHour) {
+        return targetHour * 3600000 - (hour * 3600000 + minute * 60000 + msIntoMinute);
+    }
+    return (24 - hour + targetHour) * 3600000 - minute * 60000 - msIntoMinute;
+}
 
-    if (hour < START_HOUR) {
-        const hoursUntilStart = START_HOUR - hour;
-        return hoursUntilStart * 3600000 - minute * 60000 - msIntoMinute;
-    }
-    if (hour > END_HOUR) {
-        const hoursUntilTomorrowStart = 24 - hour + START_HOUR;
-        return hoursUntilTomorrowStart * 3600000 - minute * 60000 - msIntoMinute;
-    }
+function msUntilNextWindowOpen(now = new Date()) {
+    return Math.max(1000, msUntilLocalHour(START_HOUR, now));
+}
+
+function msUntilNextIntervalBoundary(now = new Date()) {
+    const { minute } = localHourMinute(now);
+    const msIntoMinute = now.getSeconds() * 1000 + now.getMilliseconds();
 
     if (CHECK_INTERVAL_MINUTES >= 60) {
-        if (minute === 0 && msIntoMinute < 5000 && isWithinWindow(now)) return 0;
+        if (minute === 0 && msIntoMinute < 5000) return 0;
         return Math.max(1000, (60 - minute) * 60000 - msIntoMinute);
     }
 
     const slotStart = Math.floor(minute / CHECK_INTERVAL_MINUTES) * CHECK_INTERVAL_MINUTES;
-    if (minute === slotStart && msIntoMinute < 5000 && isWithinWindow(now)) return 0;
+    if (minute === slotStart && msIntoMinute < 5000) return 0;
 
     const nextMinute = slotStart + CHECK_INTERVAL_MINUTES;
     if (nextMinute >= 60) {
         return Math.max(1000, (60 - minute) * 60000 - msIntoMinute);
     }
     return Math.max(1000, (nextMinute - minute) * 60000 - msIntoMinute);
+}
+
+function msUntilNextScheduledCheck(now = new Date()) {
+    if (!isWithinWindow(now)) {
+        return msUntilNextWindowOpen(now);
+    }
+
+    const wait = msUntilNextIntervalBoundary(now);
+    const nextAt = new Date(now.getTime() + wait);
+    if (!isWithinWindow(nextAt)) {
+        return msUntilNextWindowOpen(now);
+    }
+    return wait;
 }
 
 function formatMs(ms) {
@@ -84,11 +102,16 @@ function formatResumeTime(ms) {
     }
 }
 
+function windowLabel() {
+    const endDisplay = END_HOUR <= 12 ? `${END_HOUR} AM` : END_HOUR === 24 ? 'midnight' : `${END_HOUR - 12} PM`;
+    return `${START_HOUR}:00–before ${endDisplay} (${TZ})`;
+}
+
 async function sleepUntilNextGateSession(workDir) {
     const wait = msUntilNextGateSession(workDir, { timeZone: TZ, startHour: START_HOUR });
     if (wait == null) return false;
     log.info(
-        `Automatic orders already completed today — paused until tomorrow (~${formatMs(wait)}, resume ~${formatResumeTime(wait)})`
+        `Automatic orders already completed today — dormant until tomorrow ~${formatResumeTime(wait)} (${windowLabel()})`
     );
     await sleep(wait);
     return true;
@@ -127,14 +150,14 @@ async function maybeRunPipelineAfterGate(workDir, gateExitCode) {
         }
         return;
     }
-    if (isPipelineDoneToday(workDir)) {
+    if (isPipelineDoneToday(workDir, TZ)) {
         log.info('Gate ready but pipeline already completed today — skipping');
         return;
     }
-    log.info('Gate READY — launching automatic orders pipeline');
+    log.info('Gate READY — launching automatic orders pipeline (once per day)');
     const pipelineCode = await runFullPipeline();
     if (pipelineCode === 0) {
-        log.info('Automatic orders pipeline finished successfully');
+        log.info('Automatic orders pipeline finished successfully — no further runs until tomorrow');
     } else {
         log.warn(`Automatic orders pipeline exited with code ${pipelineCode} — will retry on a later gate check`);
     }
@@ -149,7 +172,7 @@ async function main() {
     const intervalLabel =
         CHECK_INTERVAL_MINUTES >= 60 ? 'hourly' : `every ${CHECK_INTERVAL_MINUTES} min`;
     log.info(
-        `Automatic Orders: ${intervalLabel} gate checks ${START_HOUR}:00–${END_HOUR}:59 (${TZ}); runs full pipeline when gate is READY (once per day).`
+        `Automatic Orders: ${intervalLabel} gate checks, ${windowLabel()}; full pipeline once per day when gate is READY.`
     );
 
     if (await sleepUntilNextGateSession(workDir)) {
@@ -174,9 +197,15 @@ async function main() {
 
         const wait = msUntilNextScheduledCheck();
         const { hour, minute } = localHourMinute();
-        log.info(
-            `Next gate check ~${formatMs(wait)} (local ${hour}:${String(minute).padStart(2, '0')}, every ${CHECK_INTERVAL_MINUTES} min, window ${START_HOUR}–${END_HOUR})`
-        );
+        if (isWithinWindow()) {
+            log.info(
+                `Next gate check ~${formatMs(wait)} (local ${hour}:${String(minute).padStart(2, '0')}, every ${CHECK_INTERVAL_MINUTES} min)`
+            );
+        } else {
+            log.info(
+                `Outside active window — dormant until ~${formatResumeTime(wait)} (${windowLabel()})`
+            );
+        }
         await sleep(wait);
 
         if (await sleepUntilNextGateSession(workDir)) {
@@ -184,7 +213,6 @@ async function main() {
         }
 
         if (!isWithinWindow()) {
-            log.info('Outside gate window — waiting for next scheduled check');
             continue;
         }
 
