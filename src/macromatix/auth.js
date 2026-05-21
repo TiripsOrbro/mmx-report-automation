@@ -61,6 +61,11 @@ async function readLoginPageError(page) {
                 const text = (el?.innerText || el?.textContent || '').replace(/\s+/g, ' ').trim();
                 if (text) return text.slice(0, 240);
             }
+            const body = (document.body?.innerText || '').replace(/\s+/g, ' ').trim();
+            const lower = body.toLowerCase();
+            if (lower.includes('invalid') || lower.includes('incorrect') || lower.includes('failed')) {
+                return body.slice(0, 240);
+            }
             return '';
         });
     } catch {
@@ -70,48 +75,22 @@ async function readLoginPageError(page) {
 
 async function submitLoginForm(page, username, password, navTimeout) {
     await page.waitForSelector('#Login_UserName', { timeout: navTimeout });
-    await page.evaluate(
-        (user, pass) => {
-            const u = document.querySelector('#Login_UserName');
-            const p = document.querySelector('#Login_Password');
-            if (!u || !p) throw new Error('Login fields not found');
-            u.focus();
-            u.value = user;
-            p.value = pass;
-            for (const el of [u, p]) {
-                el.dispatchEvent(new Event('input', { bubbles: true }));
-                el.dispatchEvent(new Event('change', { bubbles: true }));
-            }
-        },
-        username,
-        password
-    );
-
-    const submitLabel = await page.evaluate(() => {
-        const btn =
-            document.querySelector('#Login_LoginButton') ||
-            document.querySelector('input[type="submit"]') ||
-            document.querySelector('button[type="submit"]');
-        if (btn) {
-            btn.click();
-            return btn.value || btn.textContent || btn.id || 'submit';
-        }
-        const form = document.querySelector('form');
-        if (form) {
-            form.submit();
-            return 'form.submit';
-        }
-        return null;
+    await page.evaluate(() => {
+        const u = document.querySelector('#Login_UserName');
+        const p = document.querySelector('#Login_Password');
+        if (u) u.value = '';
+        if (p) p.value = '';
     });
-    if (!submitLabel) throw new Error('Login button not found');
+    await page.type('#Login_UserName', username, { delay: 25 });
+    await page.type('#Login_Password', password, { delay: 25 });
 
-    log.info(`Login submit clicked (${String(submitLabel).trim().slice(0, 40)})`);
-    await Promise.race([
-        page.waitForNavigation({ waitUntil: 'networkidle2', timeout: navTimeout }).catch(() => {}),
-        page
-            .waitForFunction(() => !/\/MMS_Logon\.aspx/i.test(location.href), { timeout: navTimeout })
-            .catch(() => {}),
-        page.waitForTimeout(4000),
+    const loginButton = await page.$('input[type="submit"]');
+    if (!loginButton) throw new Error('Login button not found');
+
+    log.info('Login submit clicked (Log On)');
+    await Promise.all([
+        page.waitForNavigation({ waitUntil: 'load', timeout: navTimeout }).catch(() => {}),
+        loginButton.click(),
     ]);
 }
 
