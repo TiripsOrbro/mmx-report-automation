@@ -70,7 +70,9 @@ async function main() {
     ensureDir(settings.downloadDir);
     ensureDir(settings.outDir);
     ensureDir(path.dirname(settings.templateLocal));
-    ensureDir(settings.userDataDir);
+    if (settings.userDataDir) {
+        ensureDir(settings.userDataDir);
+    }
 
     if (isFullPipelineRun() && !forceRun && isPipelineDoneToday(settings.workDir)) {
         log.info(
@@ -90,7 +92,11 @@ async function main() {
         });
 
         if (loginOnly) {
-            log.info('Login-only complete. Session stored in userDataDir.');
+            log.info(
+                settings.userDataDir
+                    ? 'Login-only complete. Session stored in userDataDir.'
+                    : 'Login-only complete (ephemeral browser — session not saved).'
+            );
             process.exit(0);
         }
 
