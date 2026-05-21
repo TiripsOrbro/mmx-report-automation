@@ -333,15 +333,33 @@ rm -f ~/mmx-report-automation/data/browser-profile/SingletonLock \
       ~/mmx-report-automation/data/browser-profile/SingletonCookie
 ```
 
-**Before manual `npm run gate-check`**, stop PM2 so two processes do not share the profile:
+**Pi `.env.production` (no scp needed)** — use the same credentials as the working dashboard and skip the saved browser profile:
+
+```ini
+MMX_USE_DASHBOARD_CREDENTIALS=true
+MMX_EPHEMERAL_BROWSER=true
+SCRAPER_EXECUTABLE_PATH=/usr/bin/chromium
+MMX_STORE_NAME="3811 Chirnside Park"
+```
+
+Remove or comment out duplicate `SCRAPER_USERNAME` / `SCRAPER_PASSWORD` in mmx `.env.production` if they are wrong — dashboard `.env.production` will be used instead.
+
+Verify:
+
+```bash
+npm run check-creds
+npm run gate-check
+```
+
+Then PM2 headless runs should log `Session already active (userDataDir)` or `Logged in to Macromatix` each run.
+
+**Before manual `npm run gate-check`**, stop PM2 if using a saved profile (not needed with `MMX_EPHEMERAL_BROWSER=true`):
 
 ```bash
 pm2 stop mmx-gate-watch
 npm run gate-check
 pm2 start mmx-gate-watch
 ```
-
-Then PM2 headless runs should log `Session already active (userDataDir)`.
 
 **If `git pull` fails** (`local changes to package.json`) or `npm ci` installs Puppeteer 25 (needs Node 22):
 

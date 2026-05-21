@@ -20,13 +20,32 @@ function loadEnv() {
     require('dotenv').config({ path: path.join(ROOT, '.env') });
     require('dotenv').config({ path: path.join(ROOT, '.env.production'), override: true });
 
-    const dashboardEnv = path.join(ROOT, '../live-dashboard-app/.env');
-    if (!fs.existsSync(dashboardEnv)) return;
+    loadSiblingEnv('../live-dashboard-app/.env', { fillEmpty: true });
+    loadSiblingEnv('../live-dashboard-app/.env.production', { fillEmpty: true });
 
-    const parsed = require('dotenv').parse(fs.readFileSync(dashboardEnv));
+    if (/^(1|true|yes|on)$/i.test(String(process.env.MMX_USE_DASHBOARD_CREDENTIALS ?? '').trim())) {
+        loadSiblingEnv('../live-dashboard-app/.env.production', {
+            override: true,
+            keys: ['SCRAPER_USERNAME', 'SCRAPER_PASSWORD', 'SCRAPER_CREDENTIALS_ENCRYPTED', 'SCRAPER_CREDENTIALS_KEY'],
+        });
+        loadSiblingEnv('../live-dashboard-app/.env', {
+            override: true,
+            keys: ['SCRAPER_USERNAME', 'SCRAPER_PASSWORD', 'SCRAPER_CREDENTIALS_ENCRYPTED', 'SCRAPER_CREDENTIALS_KEY'],
+        });
+    }
+}
+
+function loadSiblingEnv(relPath, { override = false, fillEmpty = false, keys = null } = {}) {
+    const p = path.join(ROOT, relPath);
+    if (!fs.existsSync(p)) return;
+
+    const parsed = require('dotenv').parse(fs.readFileSync(p));
     for (const [key, value] of Object.entries(parsed)) {
         if (value == null || value === '') continue;
-        if (process.env[key] === undefined || process.env[key] === '') {
+        if (keys && !keys.includes(key)) continue;
+        if (override) {
+            process.env[key] = value;
+        } else if (fillEmpty && (process.env[key] === undefined || process.env[key] === '')) {
             process.env[key] = value;
         }
     }
@@ -49,6 +68,8 @@ function augmentPipeline(pipeline) {
 function getSettings() {
     loadEnv();
     const workDir = path.resolve(ROOT, process.env.MMX_WORK_DIR || './data');
+    const ephemeralBrowser = /^(1|true|yes|on)$/i.test(String(process.env.MMX_EPHEMERAL_BROWSER ?? '').trim());
+    const userDataDirRaw = String(process.env.MMX_USER_DATA_DIR ?? '').trim();
     return {
         root: ROOT,
         workDir,
@@ -71,7 +92,8 @@ function getSettings() {
             .map((s) => s.trim())
             .filter(Boolean)
             .map((p) => path.resolve(ROOT, p)),
-        userDataDir: path.resolve(ROOT, process.env.MMX_USER_DATA_DIR || path.join(workDir, 'browser-profile')),
+        userDataDir,
+        ephemeralBrowser,
         loginSuccessUrlPart: process.env.MMX_LOGIN_SUCCESS_URL_PART || '/MMS_',
         navTimeoutMs: Number(process.env.MMX_NAV_TIMEOUT_MS || 45000),
         downloadWaitMs: Number(process.env.MMX_DOWNLOAD_WAIT_MS || 120000),
