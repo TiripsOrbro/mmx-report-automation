@@ -285,6 +285,38 @@ npm start -- --force
 
 ---
 
+## 8b. PM2 (optional alternative to systemd)
+
+If you use PM2 instead of systemd, **do not** point it at `index.js` (that file does not exist). Use the included ecosystem file:
+
+```bash
+cd ~/mmx-report-automation
+git pull
+npm ci
+
+# Stop any broken process
+pm2 delete mmx-report 2>/dev/null || true
+
+# Gate watch only (recommended for always-on PM2)
+pm2 start ecosystem.config.cjs
+pm2 save
+pm2 logs mmx-gate-watch --lines 50
+```
+
+The PM2 app runs **`gate-watch`** (hourly gate checks), not the full pipeline. Schedule the full pipeline separately (`npm start` via cron, systemd timer, or manual).
+
+**First-time login on the Pi:** headless login often hangs if the browser profile has no saved session. Run once interactively (SSH + desktop, or VNC):
+
+```bash
+cd ~/mmx-report-automation
+set -a && source .env.production && set +a
+SCRAPER_HEADLESS=false npm run login
+```
+
+That saves cookies in `data/browser-profile`. After that, PM2 headless runs should skip password entry.
+
+---
+
 ## 9. Running with live-dashboard-app on the same Pi
 
 | | live-dashboard-app | mmx-report-automation |

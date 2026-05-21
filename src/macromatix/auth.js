@@ -49,6 +49,7 @@ function isMacromatixLogonPage(url, hasLoginForm) {
 async function waitForPostLogin(page, loginSuccessUrlPart, loginWaitMs) {
     const needle = String(loginSuccessUrlPart || 'MMS_Stores').replace(/^\//, '');
     const start = Date.now();
+    let lastLogAt = 0;
     while (Date.now() - start < loginWaitMs) {
         let url = '';
         let onLogin = null;
@@ -58,6 +59,14 @@ async function waitForPostLogin(page, loginSuccessUrlPart, loginWaitMs) {
         } catch {
             await page.waitForTimeout(500);
             continue;
+        }
+
+        if (Date.now() - lastLogAt >= 15000) {
+            const onLoginPage = isMacromatixLogonPage(url, Boolean(onLogin));
+            log.info(
+                `Waiting for login… (${Math.round((Date.now() - start) / 1000)}s) url=${url.slice(0, 80)} onLoginPage=${onLoginPage}`
+            );
+            lastLogAt = Date.now();
         }
 
         if (isMacromatixLogonPage(url, Boolean(onLogin))) {
@@ -114,10 +123,17 @@ async function loginMacromatix(page, options = {}) {
         loginButton.click(),
     ]);
 
+    log.info('Credentials submitted — waiting for Macromatix session…');
     const ok = await waitForPostLogin(page, loginSuccessUrlPart, loginWaitMs);
     if (!ok) {
+        let hint = '';
+        try {
+            hint = ` Last url: ${page.url()}`;
+        } catch {
+            /* ignore */
+        }
         throw new Error(
-            `Login did not complete within ${loginWaitMs}ms. Run with SCRAPER_HEADLESS=false to watch the browser, then retry (userDataDir saves session).`
+            `Login did not complete within ${loginWaitMs}ms.${hint} Run \`npm run login\` once on the Pi (SCRAPER_HEADLESS=false) to save a session in userDataDir, then retry.`
         );
     }
     log.info('Logged in to Macromatix');
