@@ -56,39 +56,15 @@ mkdir -p data/workbooks
 
 ## 3. Environment file
 
-Keep secrets out of systemd unit files. Use a file readable only by the Pi user:
+Keep secrets out of systemd unit files. On the Pi:
 
 ```bash
-sudo install -o pi -g pi -m 600 /dev/null /home/pi/mmx-report-automation/.env.production
-nano /home/pi/mmx-report-automation/.env.production
+cp .env.pi.example .env.production
+nano .env.production   # fill in the EDIT THESE block at the top
+chmod 600 .env.production
 ```
 
-Example `/home/pi/mmx-report-automation/.env.production`:
-
-```ini
-# Macromatix (same account as live-dashboard-app)
-SCRAPER_USERNAME=your-macromatix-username
-SCRAPER_PASSWORD=your-macromatix-password
-
-# Pi: use system Chromium (required — bundled Puppeteer Chrome is x86 only)
-SCRAPER_HEADLESS=true
-SCRAPER_EXECUTABLE_PATH=/usr/bin/chromium
-
-MMX_USER_DATA_DIR=/home/pi/mmx-report-automation/data/browser-profile
-MMX_STORE_NAME=3811 Chirnside Park
-MMX_TIME_ZONE=Australia/Melbourne
-
-MMX_WORK_DIR=/home/pi/mmx-report-automation/data
-MMX_TEMPLATE_LOCAL=/home/pi/mmx-report-automation/data/workbooks/Build To JS.xlsx
-
-# Hourly gate window (local store time)
-MMX_GATE_SCHEDULE_START=9
-MMX_GATE_SCHEDULE_END=23
-
-MMX_NAV_TIMEOUT_MS=45000
-MMX_DOWNLOAD_WAIT_MS=120000
-MMX_LOGIN_WAIT_MS=300000
-```
+The **EDIT THESE** section at the top of `.env.production` is all you need for a first deploy. Optional settings stay below the divider. See `.env.pi.example` in the repo for the full template.
 
 Optional: point at the dashboard env so credentials stay in one place:
 

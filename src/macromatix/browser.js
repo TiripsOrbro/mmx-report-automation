@@ -1,7 +1,22 @@
 const fs = require('fs');
+const { isWindows } = require('../utils/platform');
 
 const BASE_URL = 'https://tacobellau.macromatix.net/';
 const GOTO_OPTS = { waitUntil: 'load', timeout: 45000 };
+
+const LINUX_CHROMIUM_CANDIDATES = [
+    '/usr/bin/chromium',
+    '/usr/bin/chromium-browser',
+    '/snap/bin/chromium',
+    '/usr/bin/google-chrome-stable',
+];
+
+const WINDOWS_CHROMIUM_CANDIDATES = [
+    'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+    'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
+    'C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe',
+    'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',
+];
 
 function resolveChromiumExecutablePath() {
     const fromEnv = String(process.env.SCRAPER_EXECUTABLE_PATH || '').trim();
@@ -11,14 +26,9 @@ function resolveChromiumExecutablePath() {
         }
         console.warn(`[MMX] SCRAPER_EXECUTABLE_PATH not found (${fromEnv}), scanning common paths`);
     }
-    const candidates = [
-        '/usr/bin/chromium',
-        '/usr/bin/chromium-browser',
-        '/snap/bin/chromium',
-        '/usr/bin/google-chrome-stable',
-        'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
-        'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
-    ];
+    const candidates = isWindows()
+        ? [...WINDOWS_CHROMIUM_CANDIDATES, ...LINUX_CHROMIUM_CANDIDATES]
+        : [...LINUX_CHROMIUM_CANDIDATES, ...WINDOWS_CHROMIUM_CANDIDATES];
     for (const p of candidates) {
         if (fs.existsSync(p)) {
             return p;

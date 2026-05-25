@@ -1,19 +1,21 @@
 # Workbooks
 
-All Excel automation files live **in this repo** under `mmx-report-automation/data/` (not `live-dashboard-app`).
+## Edit these first (in `.env`)
+
+| Variable | Use |
+|----------|-----|
+| `MMX_TEMPLATE_ONEDRIVE` | Your PC / OneDrive Build To file |
+| `MMX_TEMPLATE_PI` | Pi path (add when ready; skipped until file exists) |
+| `MMX_TEMPLATE_FALLBACK` | Local repo copy `./data/workbooks/Build To JS.xlsx` |
+
+First path that **exists** on the machine wins. On Windows you get OneDrive; on Pi (before the Pi file exists) you get the fallback.
+
+Optional: `MMX_TEMPLATE_LOCAL` with semicolons replaces all three named vars.
+
+---
 
 | File | Role |
 |------|------|
-| **Build To JS.xlsx** | Master template — Macromatix exports are merged into **STOCK ON HAND** and **STOCK ON ORDER** |
+| **Build To JS.xlsx** | Default fallback template in this folder |
 
-Canonical path:
-
-```
-mmx-report-automation/data/workbooks/Build To JS.xlsx
-```
-
-Set in `.env` as `MMX_TEMPLATE_LOCAL=./data/workbooks/Build To JS.xlsx` (default).
-
-A timestamped backup is written to `data/out/` each run (`Build To JS-YYYYMMDD-HHmm.xlsx`).
-
-Sample exports to merge: `data/inbox/samples/Stock On Hand.xls` and `Stock On Order.xls`.
+Backups: `data/out/Build To JS-YYYYMMDD-HHmm.xlsx`. Sample reports: `data/inbox/samples/`.

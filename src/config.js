@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const { platformEnvSuffix } = require('./utils/platform');
 
 const ROOT = path.join(__dirname, '..');
 
@@ -16,9 +17,18 @@ function loadJson(relPath, required = true) {
     return JSON.parse(fs.readFileSync(p, 'utf8'));
 }
 
+function loadEnvFile(name, { override = false } = {}) {
+    const p = path.join(ROOT, name);
+    if (fs.existsSync(p)) {
+        require('dotenv').config({ path: p, override });
+    }
+}
+
+/** Shared → platform overlay (.env.windows / .env.pi) → production. Machine readable paths stay out of git. */
 function loadEnv() {
-    require('dotenv').config({ path: path.join(ROOT, '.env') });
-    require('dotenv').config({ path: path.join(ROOT, '.env.production'), override: true });
+    loadEnvFile('.env');
+    loadEnvFile(`.env.${platformEnvSuffix()}`, { override: true });
+    loadEnvFile('.env.production', { override: true });
 
     loadSiblingEnv('../live-dashboard-app/.env', { fillEmpty: true });
     loadSiblingEnv('../live-dashboard-app/.env.production', { fillEmpty: true });
@@ -51,6 +61,68 @@ function loadSiblingEnv(relPath, { override = false, fillEmpty = false, keys = n
     }
 }
 
+/** Resolve env path: absolute/UNC as-is; relative paths from `baseDir` (repo root by default). */
+function resolveConfigPath(raw, baseDir = ROOT) {
+    const trimmed = String(raw || '').trim();
+    if (!trimmed) return null;
+    if (path.isAbsolute(trimmed) || trimmed.startsWith('\\\\')) {
+        return path.normalize(trimmed);
+    }
+    return path.resolve(baseDir, trimmed);
+}
+
+/**
+ * Build ordered workbook candidates. First existing file wins on each machine.
+ * - MMX_TEMPLATE_LOCAL — semicolon-separated list (overrides named vars when set)
+ * - Or: MMX_TEMPLATE_ONEDRIVE, MMX_TEMPLATE_PI, MMX_TEMPLATE_FALLBACK (one path per line)
+ */
+function buildTemplateLocalCandidates(workDir, baseDir = ROOT) {
+    const explicitList = String(process.env.MMX_TEMPLATE_LOCAL || '')
+        .split(';')
+        .map((s) => s.trim())
+        .filter(Boolean);
+
+    if (explicitList.length) {
+        return explicitList.map((p) => resolveConfigPath(p, baseDir));
+    }
+
+    const named = [
+        process.env.MMX_TEMPLATE_ONEDRIVE,
+        process.env.MMX_TEMPLATE_PI,
+        process.env.MMX_TEMPLATE_FALLBACK,
+    ]
+        .map((s) => String(s || '').trim())
+        .filter(Boolean)
+        .map((p) => resolveConfigPath(p, baseDir));
+
+    if (named.length) return named;
+
+    return [resolveConfigPath(path.join(workDir, 'workbooks', 'Build To JS.xlsx'), baseDir)];
+}
+
+/** Pick first existing candidate, or first in list (create/copy target) if none exist yet. */
+function resolveTemplateLocal(workDir, baseDir = ROOT) {
+    const candidates = buildTemplateLocalCandidates(workDir, baseDir);
+    const existing = candidates.find((p) => fs.existsSync(p));
+    return {
+        path: existing || candidates[0],
+        candidates,
+        exists: Boolean(existing),
+    };
+}
+
+function logTemplateLocalChoice(settings) {
+    const log = require('./utils/logging');
+    const status = settings.templateLocalExists ? 'using existing' : 'target (not found yet)';
+    log.info(`Build To workbook (${status}): ${settings.templateLocal}`);
+    if (settings.templateLocalCandidates.length > 1) {
+        const checked = settings.templateLocalCandidates
+            .map((p) => `${p}${fs.existsSync(p) ? ' ✓' : ''}`)
+            .join('\n  ');
+        log.info(`  Paths checked (first ✓ wins):\n  ${checked}`);
+    }
+}
+
 function augmentPipeline(pipeline) {
     const next = { ...pipeline, gate: { ...(pipeline.gate || {}) } };
     const gateUrl = String(process.env.MMX_GATE_URL || '').trim();
@@ -67,27 +139,27 @@ function augmentPipeline(pipeline) {
 
 function getSettings() {
     loadEnv();
-    const workDir = path.resolve(ROOT, process.env.MMX_WORK_DIR || './data');
+    const workDir = resolveConfigPath(process.env.MMX_WORK_DIR || './data', ROOT);
     const ephemeralBrowser = /^(1|true|yes|on)$/i.test(String(process.env.MMX_EPHEMERAL_BROWSER ?? '').trim());
     const userDataDirRaw = String(process.env.MMX_USER_DATA_DIR ?? '').trim();
     const userDataDir = ephemeralBrowser
         ? null
         : userDataDirRaw
-          ? path.resolve(ROOT, userDataDirRaw)
-          : path.resolve(workDir, 'browser-profile');
+          ? resolveConfigPath(userDataDirRaw, ROOT)
+          : path.join(workDir, 'browser-profile');
+    const template = resolveTemplateLocal(workDir, ROOT);
     return {
         root: ROOT,
         workDir,
-        downloadDir: path.resolve(ROOT, process.env.MMX_DOWNLOAD_DIR || path.join(workDir, 'inbox')),
-        templateLocal: path.resolve(
-            ROOT,
-            process.env.MMX_TEMPLATE_LOCAL || path.join(workDir, 'workbooks', 'Build To JS.xlsx')
-        ),
+        downloadDir: resolveConfigPath(process.env.MMX_DOWNLOAD_DIR || path.join(workDir, 'inbox'), ROOT),
+        templateLocal: template.path,
+        templateLocalCandidates: template.candidates,
+        templateLocalExists: template.exists,
         templateSource: process.env.MMX_TEMPLATE_SOURCE
-            ? path.resolve(process.env.MMX_TEMPLATE_SOURCE)
+            ? resolveConfigPath(process.env.MMX_TEMPLATE_SOURCE, ROOT)
             : null,
         templatePublish: process.env.MMX_TEMPLATE_PUBLISH
-            ? path.resolve(process.env.MMX_TEMPLATE_PUBLISH)
+            ? resolveConfigPath(process.env.MMX_TEMPLATE_PUBLISH, ROOT)
             : null,
         templateAlwaysCopy: !/^(0|false|no|off)$/i.test(
             String(process.env.MMX_TEMPLATE_ALWAYS_COPY ?? 'false').trim()
@@ -96,7 +168,7 @@ function getSettings() {
             .split(';')
             .map((s) => s.trim())
             .filter(Boolean)
-            .map((p) => path.resolve(ROOT, p)),
+            .map((p) => resolveConfigPath(p, ROOT)),
         userDataDir,
         ephemeralBrowser,
         loginSuccessUrlPart: process.env.MMX_LOGIN_SUCCESS_URL_PART || '/MMS_',
@@ -111,4 +183,14 @@ function getSettings() {
     };
 }
 
-module.exports = { ROOT, loadEnv, getSettings, loadJson };
+module.exports = {
+    ROOT,
+    loadEnv,
+    loadEnvFile,
+    getSettings,
+    loadJson,
+    resolveConfigPath,
+    buildTemplateLocalCandidates,
+    resolveTemplateLocal,
+    logTemplateLocalChoice,
+};

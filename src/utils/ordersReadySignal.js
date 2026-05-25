@@ -1,11 +1,12 @@
 const fs = require('fs');
 const path = require('path');
+const { resolveConfigPath } = require('../config');
 
 const ROOT = path.join(__dirname, '..', '..');
 
 function resolveSignalPath() {
     const env = String(process.env.DASHBOARD_ORDERS_READY_FILE || '').trim();
-    if (env) return path.resolve(env);
+    if (env) return resolveConfigPath(env, ROOT);
     return path.join(ROOT, '../live-dashboard-app/data/orders-ready-for-review.json');
 }
 

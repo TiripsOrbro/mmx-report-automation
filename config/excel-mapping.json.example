@@ -1,27 +1,25 @@
 {
-  "templateSheet": "Data",
   "mappings": [
     {
       "fromReport": "report1",
       "fromSheet": "Sheet1",
-      "fromRange": "A2:B100",
-      "toSheet": "Data",
+      "fromRange": "auto",
+      "toSheet": "STOCK ON HAND",
       "toStartCell": "A1",
       "clearBeforePaste": true,
-      "clearRange": "A1:Z250",
+      "clearRange": "A1:Z500",
       "mode": "values"
     },
     {
       "fromReport": "report2",
       "fromSheet": "Sheet1",
-      "fromRange": "A2:C50",
-      "toSheet": "Data",
-      "toStartCell": "E5",
+      "fromRange": "auto",
+      "toSheet": "STOCK ON ORDER",
+      "toStartCell": "A1",
+      "clearBeforePaste": true,
+      "clearRange": "A1:Z500",
       "mode": "values"
     }
   ],
-  "extractForMacromatix": [
-    { "cell": "Summary!B2", "key": "value1" },
-    { "cell": "Summary!B3", "key": "value2" }
-  ]
+  "extractForMacromatix": []
 }

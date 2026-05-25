@@ -22,7 +22,9 @@ async function copyTemplate(settings) {
             copyFileSafe(settings.templateSource, local);
         } else {
             throw new Error(
-                `Template not found: ${local}\nCopy "Build To JS.xlsx" into data/workbooks/ (see data/workbooks/README.md).`
+                `Template not found: ${local}\n` +
+                    `Set MMX_TEMPLATE_ONEDRIVE / MMX_TEMPLATE_PI / MMX_TEMPLATE_FALLBACK in .env, ` +
+                    `or MMX_TEMPLATE_LOCAL with a semicolon-separated list. See .env.example.`
             );
         }
     } else if (settings.templateSource && fs.existsSync(settings.templateSource) && settings.templateAlwaysCopy) {

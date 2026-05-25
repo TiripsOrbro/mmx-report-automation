@@ -15,33 +15,35 @@
   "reports": [
     {
       "id": "report1",
-      "label": "Report 1",
-      "url": "https://tacobellau.macromatix.net/REPLACE_REPORT_1.aspx",
-      "waitAfterNavigateMs": 2000,
-      "exportButtonSelector": "input[value='Export']",
+      "label": "Stock On Hand",
+      "type": "supplyChain",
+      "group": "Supply Chain",
+      "reportName": "SCM - Items On Hand (Flat)",
+      "format": "Excel Data Only",
       "exportLinkText": "Excel Data Only",
-      "expectedHeaders": ["ColumnA", "ColumnB"]
+      "downloadExt": ".xls",
+      "startDate": "tomorrow",
+      "timeZone": "Australia/Melbourne"
     },
     {
       "id": "report2",
-      "label": "Report 2",
-      "url": "https://tacobellau.macromatix.net/REPLACE_REPORT_2.aspx",
-      "waitAfterNavigateMs": 2000,
-      "exportButtonSelector": "input[value='Export']",
+      "label": "Stock On Order",
+      "type": "supplyChain",
+      "group": "Supply Chain",
+      "reportName": "SCM - Items On Order (Flat)",
+      "format": "Excel Data Only",
       "exportLinkText": "Excel Data Only",
-      "expectedHeaders": ["ColumnA", "ColumnB"]
+      "downloadExt": ".xls",
+      "startDate": "daysAgo:7",
+      "endDate": "daysFromNow:21",
+      "dateOnly": true,
+      "timeZone": "Australia/Melbourne"
     }
   ],
   "paste": {
     "url": "https://tacobellau.macromatix.net/REPLACE_ENTRY_PAGE.aspx",
     "readySelector": "form#aspnetForm",
-    "fields": [
-      {
-        "key": "value1",
-        "selector": "#ctl00_ph_txtField1",
-        "type": "text"
-      }
-    ],
+    "fields": [],
     "submitSelector": "input[type='submit'][value='Save']"
   }
 }

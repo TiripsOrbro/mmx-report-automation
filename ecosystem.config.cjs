@@ -7,6 +7,7 @@
  */
 const path = require('path');
 const fs = require('fs');
+const { platformEnvSuffix } = require('./src/utils/platform');
 
 const ROOT = __dirname;
 
@@ -34,6 +35,7 @@ function loadEnvFile(name) {
 
 const env = {
     ...loadEnvFile('.env'),
+    ...loadEnvFile(`.env.${platformEnvSuffix()}`),
     ...loadEnvFile('.env.production'),
     NODE_ENV: 'production',
 };

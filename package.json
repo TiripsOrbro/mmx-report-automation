@@ -20,6 +20,7 @@
     "discover": "node scripts/discover-mmx-menu.js",
     "probe-stock-count": "node scripts/probe-stock-count.js",
     "dry-run": "node src/run.js --dry-run",
+    "test-download-merge": "node src/run.js --dry-run --skip-gate --force",
     "excel-only": "node src/runExcelOnly.js",
     "inspect": "node scripts/inspect-workbook.js"
   },

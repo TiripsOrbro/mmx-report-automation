@@ -7,7 +7,7 @@
  */
 const path = require('path');
 const fs = require('fs');
-const { getSettings, ROOT, loadJson } = require('./config');
+const { getSettings, ROOT, loadJson, logTemplateLocalChoice } = require('./config');
 const { runExcelTransform } = require('./pipeline/excelTransform');
 const { copyFileSafe, ensureDir, timestampSlug } = require('./utils/files');
 const log = require('./utils/logging');
@@ -51,7 +51,8 @@ function resolveSampleReports(settings, cliPaths) {
 function backupWorkbook(templatePath, outDir) {
     if (!fs.existsSync(templatePath)) {
         throw new Error(
-            `Template not found: ${templatePath}\nCopy "Build To JS.xlsx" to data/workbooks/Build To JS.xlsx`
+            `Template not found: ${templatePath}\n` +
+                `Set MMX_TEMPLATE_ONEDRIVE / MMX_TEMPLATE_PI / MMX_TEMPLATE_FALLBACK in .env (see .env.example).`
         );
     }
     ensureDir(outDir);
@@ -68,6 +69,8 @@ async function main() {
     settings.templateAlwaysCopy = false;
     settings.templateSource = null;
     settings.templatePublish = null;
+
+    logTemplateLocalChoice(settings);
 
     const templatePath = settings.templateLocal;
     backupWorkbook(templatePath, settings.outDir);

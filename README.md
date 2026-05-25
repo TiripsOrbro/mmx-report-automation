@@ -13,8 +13,9 @@ Runs in its **own process** with its **own browser profile** (`data/browser-prof
 ## Prerequisites
 
 - Node.js 16+
-- Windows access to the company-server workbook path (UNC or mapped drive), if you use `MMX_TEMPLATE_SOURCE`
 - Macromatix credentials in `.env` (same variables as the dashboard)
+- **Windows (dev):** Google Chrome (auto-detected) or set `SCRAPER_EXECUTABLE_PATH`
+- **Raspberry Pi (production):** system Chromium — see [docs/raspberry-pi-setup.md](docs/raspberry-pi-setup.md)
 
 ## Quick start (Excel only — no Macromatix login)
 
@@ -85,17 +86,55 @@ Leave this running in a terminal or register it as a Windows scheduled task / se
 
 ## Configuration
 
+### Edit these first
+
+| What | Where | Variable |
+|------|--------|----------|
+| Macromatix login | `.env` | `SCRAPER_USERNAME`, `SCRAPER_PASSWORD` |
+| Store name (report tree) | `.env` | `MMX_STORE_NAME` |
+| Build To — OneDrive (Windows) | `.env` | `MMX_TEMPLATE_ONEDRIVE` |
+| Build To — Pi (when ready) | `.env` | `MMX_TEMPLATE_PI` |
+| Build To — local fallback | `.env` | `MMX_TEMPLATE_FALLBACK` |
+| Chromium on Pi | `.env.production` | `SCRAPER_EXECUTABLE_PATH` |
+
+**Workbook path list:** set `MMX_TEMPLATE_ONEDRIVE`, `MMX_TEMPLATE_PI`, and `MMX_TEMPLATE_FALLBACK` in `.env` (one path per line). The app uses the **first path that exists** on that machine — so the same `.env` works on your PC and Pi. Until the Pi file exists, it falls back to `data/workbooks/Build To JS.xlsx`.
+
+Or use `MMX_TEMPLATE_LOCAL` with semicolon-separated paths instead of the three named vars.
+
+Each file has an **EDIT THESE** section at the top — change only that block unless you need advanced options below it.
+
 | File | Purpose |
 |------|---------|
-| `.env` | Credentials, paths, timeouts (see `.env.example`) |
+| `.env` | Shared credentials and settings (see `.env.example`) |
+| `.env.windows` | Windows-only paths (OneDrive, Chrome) — auto-loaded on PC |
+| `.env.pi` / `.env.production` | Pi paths and Chromium — auto-loaded on Linux |
 | `config/pipeline.json` | Gate URL, two report URLs/export selectors, paste-back form |
 | `config/excel-mapping.json` | Report ranges → template cells; cells → Macromatix paste keys |
 | `docs/mmx-report-automation-discovery.md` | Checklist to fill before production |
 
+### Windows + Pi (two machines)
+
+The same repo runs on your **Windows PC** (writing/testing) and **Raspberry Pi** (hosting). Committed code uses **relative paths** by default; machine-specific absolute paths live in gitignored env files only.
+
+**Load order:** `.env` → `.env.windows` or `.env.pi` (by OS) → `.env.production`
+
+| Machine | Setup |
+|---------|--------|
+| **Windows** | `cp .env.example .env` — set credentials and the three `MMX_TEMPLATE_*` paths in **EDIT THESE** |
+| **Pi** | Same paths in `.env` or `cp .env.pi.example .env.production` for Pi-only overrides |
+
+Never commit `.env`, `.env.windows`, or `.env.production`. Pulling git on either machine will not overwrite them.
+
+Cross-platform behaviour in code:
+- **Paths:** `resolveConfigPath()` accepts relative, absolute Windows, Linux, and UNC paths
+- **Browser:** Chrome on Windows, `/usr/bin/chromium` on Pi (`SCRAPER_EXECUTABLE_PATH` overrides)
+- **Excel recalc:** Excel COM on Windows, LibreOffice on Pi (`scripts/recalc-workbook.ps1` / `.sh`)
+
 ### Environment highlights
 
 - `MMX_TEMPLATE_SOURCE` — UNC path to master workbook on company server
-- `MMX_TEMPLATE_LOCAL` — working workbook (default `./data/workbooks/Build To JS.xlsx`)
+- `MMX_TEMPLATE_ONEDRIVE` / `MMX_TEMPLATE_PI` / `MMX_TEMPLATE_FALLBACK` — ordered list; first existing file wins (see `.env.example`)
+- `MMX_TEMPLATE_LOCAL` — optional semicolon-separated list (overrides the three named vars)
 - `MMX_TEMPLATE_PUBLISH` — optional write-back to server after merge
 - `MMX_USER_DATA_DIR` — Chrome profile for saved login session (default `./data/browser-profile`)
 - `MMX_DOWNLOAD_DIR` — Macromatix Excel Data Only downloads (default `./data/inbox`)

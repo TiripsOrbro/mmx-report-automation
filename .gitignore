@@ -1,6 +1,9 @@
 node_modules/
 .env
 .env.production
+.env.windows
+.env.pi
+.env.local
 data/inbox/*
 !data/inbox/.gitkeep
 data/out/*

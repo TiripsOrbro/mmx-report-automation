@@ -258,23 +258,31 @@ function storeNeedles(storeName) {
     const s = String(storeName || '').trim();
     const needles = new Set();
     if (s) needles.add(s.toLowerCase());
-    const num = s.match(/\b(\d{4})\b/);
-    if (num) needles.add(num[1]);
     const nameOnly = s.replace(/^\d+\s*/, '').trim().toLowerCase();
     if (nameOnly) needles.add(nameOnly);
+    const num = s.match(/\b(\d{4})\b/);
+    if (num) needles.add(num[1]);
     return [...needles];
 }
 
 async function tryStoreDropdown(page, needle) {
     return page.evaluate((want) => {
+        const matchesStore = (text) => {
+            const t = String(text || '').trim().toLowerCase();
+            if (!t) return false;
+            if (/^\d+$/.test(want)) {
+                const escaped = want.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                return new RegExp(`(^|\\D)${escaped}(\\D|$)`).test(t);
+            }
+            return t.includes(want) || want.includes(t);
+        };
         for (const sel of document.querySelectorAll('select')) {
             const ctx = ((sel.closest('tr, td, div, table') || sel).innerText || '').toLowerCase();
             if (!ctx.includes('store') && !Array.from(sel.options).some((o) => /\b\d{4}\b/.test(o.text))) {
                 continue;
             }
             for (const opt of sel.options) {
-                const t = (opt.textContent || '').trim().toLowerCase();
-                if (t.includes(want) || want.includes(t)) {
+                if (matchesStore(opt.textContent)) {
                     sel.value = opt.value;
                     sel.dispatchEvent(new Event('change', { bubbles: true }));
                     return opt.textContent.trim();
@@ -305,10 +313,19 @@ async function tryStoreTree(page, needle) {
     await expandStoreTree(page);
 
     return page.evaluate((want) => {
+        const matchesStore = (text) => {
+            const t = String(text || '').replace(/\s+/g, ' ').trim().toLowerCase();
+            if (!t) return false;
+            if (/^\d+$/.test(want)) {
+                const escaped = want.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                return new RegExp(`(^|\\D)${escaped}(\\D|$)`).test(t);
+            }
+            return t.includes(want);
+        };
         for (const cb of document.querySelectorAll('input[type="checkbox"]')) {
             const row = cb.closest('tr, div, li, span, label') || cb.parentElement;
             const text = (row && row.textContent ? row.textContent : '').replace(/\s+/g, ' ').toLowerCase();
-            if (text.includes(want)) {
+            if (matchesStore(text)) {
                 row?.scrollIntoView?.({ block: 'center' });
                 if (!cb.checked) cb.click();
                 return text.trim().slice(0, 80);
@@ -316,7 +333,7 @@ async function tryStoreTree(page, needle) {
         }
         for (const el of document.querySelectorAll('label, span, a, option, td')) {
             const t = (el.textContent || '').replace(/\s+/g, ' ').trim();
-            if (t.toLowerCase().includes(want) && t.length < 60) {
+            if (matchesStore(t) && t.length < 60) {
                 el.scrollIntoView?.({ block: 'center' });
                 const cb = el.querySelector('input[type="checkbox"]') || el.previousElementSibling;
                 if (cb && cb.type === 'checkbox') {
@@ -331,9 +348,18 @@ async function tryStoreTree(page, needle) {
 
 async function tryStoreClickByText(page, needle) {
     const handle = await page.evaluateHandle((want) => {
+        const matchesStore = (text) => {
+            const t = String(text || '').replace(/\s+/g, ' ').trim().toLowerCase();
+            if (!t) return false;
+            if (/^\d+$/.test(want)) {
+                const escaped = want.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                return new RegExp(`(^|\\D)${escaped}(\\D|$)`).test(t);
+            }
+            return t.includes(want);
+        };
         for (const el of document.querySelectorAll('label, span, a, td, div')) {
             const t = (el.textContent || '').replace(/\s+/g, ' ').trim().toLowerCase();
-            if (!t.includes(want) || t.length > 70) continue;
+            if (!matchesStore(t) || t.length > 70) continue;
             if (el.children.length > 4) continue;
             const cb = el.querySelector('input[type="checkbox"]');
             if (cb) return cb;
@@ -359,17 +385,26 @@ async function tryStoreInFrames(page, needles) {
         for (const needle of needles) {
             try {
                 const picked = await frame.evaluate((want) => {
+                    const matchesStore = (text) => {
+                        const t = String(text || '').replace(/\s+/g, ' ').trim().toLowerCase();
+                        if (!t) return false;
+                        if (/^\d+$/.test(want)) {
+                            const escaped = want.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                            return new RegExp(`(^|\\D)${escaped}(\\D|$)`).test(t);
+                        }
+                        return t.includes(want);
+                    };
                     for (const cb of document.querySelectorAll('input[type="checkbox"]')) {
                         const row = cb.closest('tr, div, li, span, label') || cb.parentElement;
                         const text = (row?.textContent || '').replace(/\s+/g, ' ').toLowerCase();
-                        if (text.includes(want)) {
+                        if (matchesStore(text)) {
                             if (!cb.checked) cb.click();
                             return text.trim().slice(0, 80);
                         }
                     }
                     for (const sel of document.querySelectorAll('select')) {
                         for (const opt of sel.options) {
-                            if ((opt.textContent || '').toLowerCase().includes(want)) {
+                            if (matchesStore(opt.textContent)) {
                                 sel.value = opt.value;
                                 sel.dispatchEvent(new Event('change', { bubbles: true }));
                                 return opt.textContent.trim();

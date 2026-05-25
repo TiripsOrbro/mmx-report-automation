@@ -7,6 +7,7 @@
  *   node src/run.js --force      # run full pipeline again same day
  *   node src/run.js --login-only # bootstrap saved browser session
  *   node src/run.js --dry-run    # gate + downloads + excel; skip MMX submit
+ *   node src/run.js --dry-run --skip-gate --force  # test download + merge without gate/daily lock
  *   node src/run.js --gate-only      # login + key item gate check only
  *   node src/run.js --reports-hub       # login + gate + open Supply Chain reports
  *   node src/run.js --download-on-hand  # login + gate + download Items On Hand only
@@ -16,7 +17,7 @@
  */
 const path = require('path');
 const fs = require('fs');
-const { getSettings, ROOT } = require('./config');
+const { getSettings, ROOT, logTemplateLocalChoice } = require('./config');
 const { launchBrowser, loginMacromatix } = require('./macromatix/auth');
 const { isKeyItemCountComplete, gateUrlConfigured } = require('./pipeline/gateKeyItemCount');
 const { downloadReports, openReportsHub, reportsConfigured } = require('./pipeline/downloadReports');
@@ -37,6 +38,8 @@ const downloadOnHand = args.has('--download-on-hand');
 const downloadOnOrder = args.has('--download-on-order');
 const downloadInventoryEvent = args.has('--download-inventory-event');
 const dryRun = args.has('--dry-run');
+const skipGate =
+    args.has('--skip-gate') || /^(1|true|yes|on)$/i.test(String(process.env.MMX_SKIP_GATE ?? '').trim());
 const ordersOnly = args.has('--orders-only');
 const keepBrowserOpen = !/^(0|false|no|off)$/i.test(String(process.env.MMX_KEEP_BROWSER_OPEN ?? '').trim());
 
@@ -86,6 +89,7 @@ async function ensureConfigExists() {
 async function main() {
     ensureConfigExists();
     const settings = getSettings();
+    logTemplateLocalChoice(settings);
     ensureDir(settings.downloadDir);
     ensureDir(settings.outDir);
     ensureDir(path.dirname(settings.templateLocal));
@@ -149,10 +153,15 @@ async function main() {
             if (gateOnly) process.exit(1);
         }
 
-        const gateOk = await isKeyItemCountComplete(page, settings.pipeline.gate, settings.navTimeoutMs, {
-            saveDiagnostics: gateOnly,
-            outDir: settings.outDir,
-        });
+        let gateOk = true;
+        if (!skipGate) {
+            gateOk = await isKeyItemCountComplete(page, settings.pipeline.gate, settings.navTimeoutMs, {
+                saveDiagnostics: gateOnly,
+                outDir: settings.outDir,
+            });
+        } else {
+            log.warn('Skipping key item gate (--skip-gate or MMX_SKIP_GATE)');
+        }
 
         if (gateOnly) {
             log.info(gateOk ? 'Gate check: READY — downloads would run next.' : 'Gate check: NOT READY');
