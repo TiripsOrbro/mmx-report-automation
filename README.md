@@ -92,14 +92,15 @@ Leave this running in a terminal or register it as a Windows scheduled task / se
 |------|--------|----------|
 | Macromatix login | `.env` | `SCRAPER_USERNAME`, `SCRAPER_PASSWORD` |
 | Store name (report tree) | `.env` | `MMX_STORE_NAME` |
-| Build To — OneDrive (Windows) | `.env` | `MMX_TEMPLATE_ONEDRIVE` |
-| Build To — Pi (when ready) | `.env` | `MMX_TEMPLATE_PI` |
-| Build To — local fallback | `.env` | `MMX_TEMPLATE_FALLBACK` |
+| Build To folder — OneDrive (Windows) | `.env` | `MMX_BUILD_TO_DIR_ONEDRIVE` |
+| Build To folder — Pi (when ready) | `.env` | `MMX_BUILD_TO_DIR_PI` |
+| Build To folder — local fallback | `.env` | `MMX_BUILD_TO_DIR_FALLBACK` |
+| Build To workbook filename | `.env` | `MMX_BUILD_TO_FILENAME` |
 | Chromium on Pi | `.env.production` | `SCRAPER_EXECUTABLE_PATH` |
 
-**Workbook path list:** set `MMX_TEMPLATE_ONEDRIVE`, `MMX_TEMPLATE_PI`, and `MMX_TEMPLATE_FALLBACK` in `.env` (one path per line). The app uses the **first path that exists** on that machine — so the same `.env` works on your PC and Pi. Until the Pi file exists, it falls back to `data/workbooks/Build To JS.xlsx`.
+**Build To folder list:** set `MMX_BUILD_TO_DIR_ONEDRIVE`, `MMX_BUILD_TO_DIR_PI`, and `MMX_BUILD_TO_DIR_FALLBACK` in `.env` (one path per line). The app uses the first `MMX_BUILD_TO_FILENAME` that exists on that machine. Downloads default to the same selected folder.
 
-Or use `MMX_TEMPLATE_LOCAL` with semicolon-separated paths instead of the three named vars.
+Or use `MMX_BUILD_TO_DIR` with semicolon-separated folders. `MMX_TEMPLATE_LOCAL` is still supported as a legacy workbook-path override.
 
 Each file has an **EDIT THESE** section at the top — change only that block unless you need advanced options below it.
 
@@ -120,7 +121,7 @@ The same repo runs on your **Windows PC** (writing/testing) and **Raspberry Pi**
 
 | Machine | Setup |
 |---------|--------|
-| **Windows** | `cp .env.example .env` — set credentials and the three `MMX_TEMPLATE_*` paths in **EDIT THESE** |
+| **Windows** | `cp .env.example .env` — set credentials and the `MMX_BUILD_TO_*` values in **EDIT THESE** |
 | **Pi** | Same paths in `.env` or `cp .env.pi.example .env.production` for Pi-only overrides |
 
 Never commit `.env`, `.env.windows`, or `.env.production`. Pulling git on either machine will not overwrite them.
@@ -133,8 +134,10 @@ Cross-platform behaviour in code:
 ### Environment highlights
 
 - `MMX_TEMPLATE_SOURCE` — UNC path to master workbook on company server
-- `MMX_TEMPLATE_ONEDRIVE` / `MMX_TEMPLATE_PI` / `MMX_TEMPLATE_FALLBACK` — ordered list; first existing file wins (see `.env.example`)
-- `MMX_TEMPLATE_LOCAL` — optional semicolon-separated list (overrides the three named vars)
+- `MMX_BUILD_TO_DIR_ONEDRIVE` / `MMX_BUILD_TO_DIR_PI` / `MMX_BUILD_TO_DIR_FALLBACK` — ordered folder list; first existing workbook wins (see `.env.example`)
+- `MMX_BUILD_TO_FILENAME` — workbook filename inside the selected folder (default `Build to.xlsx`)
+- `MMX_DOWNLOAD_DIR` — optional override; defaults to the selected Build To folder
+- `MMX_TEMPLATE_LOCAL` — legacy optional semicolon-separated workbook list
 - `MMX_TEMPLATE_PUBLISH` — optional write-back to server after merge
 - `MMX_USER_DATA_DIR` — Chrome profile for saved login session (default `./data/browser-profile`)
 - `MMX_DOWNLOAD_DIR` — Macromatix Excel Data Only downloads (default `./data/inbox`)

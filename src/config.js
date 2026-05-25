@@ -73,17 +73,63 @@ function resolveConfigPath(raw, baseDir = ROOT) {
 
 /**
  * Build ordered workbook candidates. First existing file wins on each machine.
+ * Preferred:
+ * - MMX_BUILD_TO_DIR — semicolon-separated list of folders
+ * - Or: MMX_BUILD_TO_DIR_ONEDRIVE, MMX_BUILD_TO_DIR_PI, MMX_BUILD_TO_DIR_FALLBACK
+ * - MMX_BUILD_TO_FILENAME — workbook name inside the chosen folder
+ *
+ * Backward compatible:
  * - MMX_TEMPLATE_LOCAL — semicolon-separated list (overrides named vars when set)
  * - Or: MMX_TEMPLATE_ONEDRIVE, MMX_TEMPLATE_PI, MMX_TEMPLATE_FALLBACK (one path per line)
  */
-function buildTemplateLocalCandidates(workDir, baseDir = ROOT) {
-    const explicitList = String(process.env.MMX_TEMPLATE_LOCAL || '')
+function splitConfigPathList(raw) {
+    return String(raw || '')
         .split(';')
         .map((s) => s.trim())
         .filter(Boolean);
+}
+
+function buildToFilename() {
+    return String(process.env.MMX_BUILD_TO_FILENAME || 'Build to.xlsx').trim();
+}
+
+function buildBuildToDirCandidates(workDir, baseDir = ROOT) {
+    const explicitList = splitConfigPathList(process.env.MMX_BUILD_TO_DIR);
+    if (explicitList.length) {
+        return explicitList.map((p) => resolveConfigPath(p, baseDir));
+    }
+
+    const named = [
+        process.env.MMX_BUILD_TO_DIR_ONEDRIVE,
+        process.env.MMX_BUILD_TO_DIR_PI,
+        process.env.MMX_BUILD_TO_DIR_FALLBACK,
+    ]
+        .map((s) => String(s || '').trim())
+        .filter(Boolean)
+        .map((p) => resolveConfigPath(p, baseDir));
+
+    if (named.length) return named;
+
+    return [resolveConfigPath(path.join(workDir, 'workbooks'), baseDir)];
+}
+
+function buildTemplateLocalCandidates(workDir, baseDir = ROOT) {
+    const explicitList = splitConfigPathList(process.env.MMX_TEMPLATE_LOCAL);
 
     if (explicitList.length) {
         return explicitList.map((p) => resolveConfigPath(p, baseDir));
+    }
+
+    const buildToDirs = buildBuildToDirCandidates(workDir, baseDir);
+    const filename = buildToFilename();
+    if (
+        process.env.MMX_BUILD_TO_DIR ||
+        process.env.MMX_BUILD_TO_DIR_ONEDRIVE ||
+        process.env.MMX_BUILD_TO_DIR_PI ||
+        process.env.MMX_BUILD_TO_DIR_FALLBACK ||
+        process.env.MMX_BUILD_TO_FILENAME
+    ) {
+        return buildToDirs.map((dir) => path.join(dir, filename));
     }
 
     const named = [
@@ -121,6 +167,15 @@ function logTemplateLocalChoice(settings) {
             .join('\n  ');
         log.info(`  Paths checked (first ✓ wins):\n  ${checked}`);
     }
+    log.info(`Report downloads folder: ${settings.downloadDir}`);
+}
+
+function resolveDownloadDir(templatePath, baseDir = ROOT) {
+    const raw = String(process.env.MMX_DOWNLOAD_DIR || '').trim();
+    if (!raw || /^same-as-workbook$/i.test(raw)) {
+        return path.dirname(templatePath);
+    }
+    return resolveConfigPath(raw, baseDir);
 }
 
 function augmentPipeline(pipeline) {
@@ -151,7 +206,7 @@ function getSettings() {
     return {
         root: ROOT,
         workDir,
-        downloadDir: resolveConfigPath(process.env.MMX_DOWNLOAD_DIR || path.join(workDir, 'inbox'), ROOT),
+        downloadDir: resolveDownloadDir(template.path, ROOT),
         templateLocal: template.path,
         templateLocalCandidates: template.candidates,
         templateLocalExists: template.exists,
