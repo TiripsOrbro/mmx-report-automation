@@ -1,5 +1,5 @@
 const fs = require('fs');
-const { isWindows } = require('../utils/platform');
+const { isWindows } = require('./util-platform');
 
 const BASE_URL = 'https://tacobellau.macromatix.net/';
 const GOTO_OPTS = { waitUntil: 'load', timeout: 45000 };

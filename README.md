@@ -26,7 +26,7 @@ cp .env.example .env
 npm run setup
 ```
 
-1. Place **Build To JS.xlsx** in `data/workbooks/Build To JS.xlsx` (see `data/README.md`).
+1. Place your **Build To workbook** where `.env` points (`MMX_BUILD_TO_DIR_*` + `MMX_BUILD_TO_FILENAME`), or use `data/workbooks` fallback.
 2. Put sample exports in `data/inbox/samples/` as **`Stock On Hand.xls`** and **`Stock On Order.xls`** (or pass paths on the CLI).
 3. Inspect sheets/headers:
 
@@ -42,7 +42,10 @@ npm run inspect -- "data/inbox/samples/Stock On Hand.xls"
 npm run excel-only
 ```
 
-Output: updated `data/workbooks/Build To JS.xlsx`, backup under `data/out/`, and `data/out/paste-values-*.json` for a later Macromatix step.
+Output: updated Build To workbook, backup under `data/out/`, and `data/out/paste-values-*.json` for a later Macromatix step.
+
+Optional: enable tab PDF export with `MMX_PDF_EXPORT_ENABLED=true` and `MMX_PDF_EXPORT_TABS` in `.env` to generate one PDF per listed tab after recalc.
+Optional: enable SMTP email sending to automatically email generated PDF attachments after each run.
 
 ### Macromatix login + key item gate
 
@@ -98,7 +101,7 @@ Leave this running in a terminal or register it as a Windows scheduled task / se
 | Build To workbook filename | `.env` | `MMX_BUILD_TO_FILENAME` |
 | Chromium on Pi | `.env.production` | `SCRAPER_EXECUTABLE_PATH` |
 
-**Build To folder list:** set `MMX_BUILD_TO_DIR_ONEDRIVE`, `MMX_BUILD_TO_DIR_PI`, and `MMX_BUILD_TO_DIR_FALLBACK` in `.env` (one path per line). The app uses the first `MMX_BUILD_TO_FILENAME` that exists on that machine. Downloads default to the same selected folder.
+**Build To folder list:** set `MMX_BUILD_TO_DIR_ONEDRIVE`, `MMX_BUILD_TO_DIR_PI`, and `MMX_BUILD_TO_DIR_FALLBACK` in `.env` (one path per line). The app uses the first `MMX_BUILD_TO_FILENAME` that exists on that machine.
 
 Or use `MMX_BUILD_TO_DIR` with semicolon-separated folders. `MMX_TEMPLATE_LOCAL` is still supported as a legacy workbook-path override.
 
@@ -136,12 +139,19 @@ Cross-platform behaviour in code:
 - `MMX_TEMPLATE_SOURCE` — UNC path to master workbook on company server
 - `MMX_BUILD_TO_DIR_ONEDRIVE` / `MMX_BUILD_TO_DIR_PI` / `MMX_BUILD_TO_DIR_FALLBACK` — ordered folder list; first existing workbook wins (see `.env.example`)
 - `MMX_BUILD_TO_FILENAME` — workbook filename inside the selected folder (default `Build to.xlsx`)
-- `MMX_DOWNLOAD_DIR` — optional override; defaults to the selected Build To folder
+- `MMX_DOWNLOAD_DIR` — optional override for temporary report downloads; default is a per-run temp folder under `MMX_WORK_DIR/out/tmp-report-downloads` (auto-deleted after merge)
 - `MMX_TEMPLATE_LOCAL` — legacy optional semicolon-separated workbook list
 - `MMX_TEMPLATE_PUBLISH` — optional write-back to server after merge
 - `MMX_USER_DATA_DIR` — Chrome profile for saved login session (default `./data/browser-profile`)
-- `MMX_DOWNLOAD_DIR` — Macromatix Excel Data Only downloads (default `./data/inbox`)
 - `MMX_STORE_NAME` — store to select in reports tree (default `3811 Chirnside Park`)
+- `MMX_PDF_EXPORT_ENABLED` — when true, export configured workbook tabs to PDF after recalc
+- `MMX_PDF_EXPORT_TABS` — semicolon/comma/newline-separated workbook tab names to export
+- `MMX_PDF_EXPORT_DIR` — output folder for tab PDFs (default `./data/out/pdfs`)
+- `MMX_EMAIL_ENABLED` — when true, send exported PDFs as email attachments
+- `MMX_EMAIL_SEND_ON_DRY_RUN` — allow email sends during dry-run (default `true`)
+- `MMX_EMAIL_SMTP_HOST` / `MMX_EMAIL_SMTP_PORT` / `MMX_EMAIL_SMTP_SECURE` — SMTP connection settings
+- `MMX_EMAIL_SMTP_USER` / `MMX_EMAIL_SMTP_PASS` — SMTP auth credentials
+- `MMX_EMAIL_FROM` / `MMX_EMAIL_TO` / `MMX_EMAIL_CC` — sender and recipients (`MMX_EMAIL_TO` supports `;` separators)
 
 ## Commands
 
@@ -149,7 +159,7 @@ Cross-platform behaviour in code:
 |---------|-------------|
 | `npm run setup` | Create `config/pipeline.json` and `config/excel-mapping.json` from examples |
 | `npm run inspect -- <file.xlsx>` | List sheet names and row-1 headers (discovery) |
-| `npm run excel-only` | Merge reports into **Build To JS.xlsx** (local files only) |
+| `npm run excel-only` | Merge reports into configured Build To workbook (local files only) |
 | `npm run login` | Log in only; store session in userDataDir |
 | `npm run discover` | After login, list Macromatix menu links (find gate/report URLs) |
 | `npm run gate-check` | Login + Stock Count → Count In Progress → latest = Key Item + Applied |
@@ -183,15 +193,16 @@ node src\run.js
 mmx-report-automation/
   config/           pipeline + excel mapping (gitignored when filled)
   data/
-    workbooks/      Build To JS.xlsx (master workbook)
-    inbox/          downloaded reports (+ samples/ for testing)
+    workbooks/      fallback workbook location (when not using Build To path)
+    inbox/          local sample reports for excel-only testing
     out/            backups + paste-values JSON
     browser-profile/ saved login session (gitignored)
   docs/             discovery checklist + raspberry-pi-setup.md
   src/
-    run.js          CLI entry
-    macromatix/     login, browser launch
-    pipeline/       gate, download, excel, paste
+    run*.js         CLI entries (full pipeline, excel-only, scheduler)
+    mmx-*.js        Macromatix browser + navigation helpers
+    pipeline-*.js   gate/download/excel/order pipeline modules
+    util-*.js       shared utility modules
 ```
 
 ## Separation from live-dashboard-app

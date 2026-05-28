@@ -1,4 +1,4 @@
-const log = require('../utils/logging');
+const log = require('./util-logging');
 
 const COUNT_IN_PROGRESS_TAB = 'Count In Progress';
 
@@ -299,7 +299,7 @@ async function navigateToSupplyChainReports(page, reportNav, navTimeoutMs) {
         throw new Error('reportNavigation.url not configured in config/pipeline.json');
     }
 
-    const { openReportSelectionPage, setGroupDropdown } = require('../pipeline/supplyChainReports');
+    const { openReportSelectionPage, setGroupDropdown } = require('./pipeline-supply-chain-reports');
     await openReportSelectionPage(page, reportNav, navTimeoutMs);
     if (reportNav.group) {
         await setGroupDropdown(page, reportNav.group);

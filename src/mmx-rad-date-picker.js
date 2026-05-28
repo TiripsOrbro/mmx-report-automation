@@ -2,7 +2,7 @@
  * Telerik RadDatePicker on Macromatix report pages.
  * Typing the visible box alone does not commit — use calendar UI + hidden field sync (same as dashboard scraper).
  */
-const log = require('../utils/logging');
+const log = require('./util-logging');
 
 const MONTH_LONG_EN = [
     'January',

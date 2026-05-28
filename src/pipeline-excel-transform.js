@@ -1,16 +1,17 @@
 const fs = require('fs');
 const path = require('path');
 const ExcelJS = require('exceljs');
-const { copyFileSafe, ensureDir } = require('../utils/files');
-const log = require('../utils/logging');
-const { recalcWorkbook } = require('../utils/recalcWorkbook');
+const { copyFileSafe, ensureDir, sleep } = require('./util-files');
+const log = require('./util-logging');
+const { recalcWorkbook } = require('./util-recalc-workbook');
+const { exportWorkbookTabsPdf } = require('./util-export-workbook-tabs-pdf');
 const {
     loadSourceWorkbook,
     resolveSourceSheet,
     getSourceCell,
     resolveSourceRange,
     parseCellRef,
-} = require('../utils/sourceWorkbook');
+} = require('./util-source-workbook');
 
 async function copyTemplate(settings) {
     const local = settings.templateLocal;
@@ -164,7 +165,7 @@ async function runExcelTransform(settings, reportPaths) {
     await wb.xlsx.readFile(templatePath);
 
     await applyMapping(wb, reportPaths, settings.excelMapping);
-    await wb.xlsx.writeFile(templatePath);
+    await writeWorkbookWithRetry(wb, templatePath);
     log.info(`Updated working template: ${templatePath}`);
 
     const recalc = recalcWorkbook(templatePath);
@@ -172,6 +173,24 @@ async function runExcelTransform(settings, reportPaths) {
         await wb.xlsx.readFile(templatePath);
     } else if (!recalc.skipped) {
         log.warn('Workbook recalc did not run — vendor order quantities may be stale');
+    }
+
+    let exportedPdfTabs = [];
+    const pdfExport = settings.pdfExport || {};
+    if (pdfExport.enabled) {
+        if (!recalc.ok) {
+            const reason = recalc.reason ? ` (${recalc.reason})` : '';
+            throw new Error(
+                `PDF export requires successful workbook recalc; recalc did not complete${reason}. ` +
+                    `Check LibreOffice/Excel availability and MMX_SKIP_WORKBOOK_RECALC.`
+            );
+        }
+        exportedPdfTabs = await exportWorkbookTabsPdf({
+            workbookPath: templatePath,
+            tabs: pdfExport.tabs,
+            outDir: pdfExport.outDir,
+        });
+        log.info(`Exported ${exportedPdfTabs.length} tab PDF(s) to ${pdfExport.outDir}`);
     }
 
     const syncedPaths = getTemplateSyncPaths(settings).length
@@ -194,7 +213,21 @@ async function runExcelTransform(settings, reportPaths) {
     fs.writeFileSync(outPath, JSON.stringify(pasteValues, null, 2));
     log.info(`Paste payload written: ${outPath}`);
 
-    return { templatePath, pasteValues, pasteValuesPath: outPath, syncedPaths };
+    return { templatePath, pasteValues, pasteValuesPath: outPath, syncedPaths, exportedPdfTabs };
 }
 
-module.exports = { runExcelTransform, copyTemplate };
+async function writeWorkbookWithRetry(wb, filePath, attempts = 12, delayMs = 5000) {
+    for (let attempt = 1; attempt <= attempts; attempt++) {
+        try {
+            await wb.xlsx.writeFile(filePath);
+            return;
+        } catch (err) {
+            const locked = err && (err.code === 'EBUSY' || /EBUSY/i.test(String(err.message)));
+            if (!locked || attempt >= attempts) throw err;
+            log.warn(`Build To workbook is locked — retrying save (${attempt}/${attempts})…`);
+            await sleep(delayMs);
+        }
+    }
+}
+
+module.exports = { runExcelTransform, copyTemplate, writeWorkbookWithRetry };

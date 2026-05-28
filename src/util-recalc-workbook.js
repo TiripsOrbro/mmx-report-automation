@@ -1,9 +1,9 @@
 const { spawnSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
-const log = require('./logging');
+const log = require('./util-logging');
 
-const ROOT = path.join(__dirname, '..', '..');
+const ROOT = path.join(__dirname, '..');
 
 function shouldSkipRecalc() {
     return /^(1|true|yes|on)$/i.test(String(process.env.MMX_SKIP_WORKBOOK_RECALC ?? '').trim());

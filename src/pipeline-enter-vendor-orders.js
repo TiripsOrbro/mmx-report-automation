@@ -1,4 +1,4 @@
-const { withPageContextRetry } = require('../macromatix/contextRetry');
+const { withPageContextRetry } = require('./mmx-context-retry');
 const {
     openScheduledOrders,
     returnToScheduledOrders,
@@ -7,9 +7,9 @@ const {
     vendorRegex,
     classMatches,
     rowIsOpenable,
-} = require('../macromatix/scheduledOrders');
-const { readVendorOrderLines, readAllVendorOrderLines } = require('./readVendorOrders');
-const log = require('../utils/logging');
+} = require('./mmx-scheduled-orders');
+const { readVendorOrderLines, readAllVendorOrderLines } = require('./pipeline-read-vendor-orders');
+const log = require('./util-logging');
 
 function normalizeItemCode(code) {
     return String(code || '')

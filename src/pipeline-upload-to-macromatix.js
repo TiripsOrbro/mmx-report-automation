@@ -1,6 +1,6 @@
-const { GOTO_OPTS } = require('../macromatix/browser');
-const { withPageContextRetry } = require('../macromatix/contextRetry');
-const log = require('../utils/logging');
+const { GOTO_OPTS } = require('./mmx-browser');
+const { withPageContextRetry } = require('./mmx-context-retry');
+const log = require('./util-logging');
 
 async function fillField(page, field, value) {
     const sel = field.selector;

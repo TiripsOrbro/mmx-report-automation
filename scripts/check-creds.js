@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /** Verify Macromatix credentials load (no password printed). */
 const { getSettings } = require('../src/config');
-const { getMacromatixCredentials } = require('../src/macromatix/auth');
+const { getMacromatixCredentials } = require('../src/mmx-auth');
 const path = require('path');
 const fs = require('fs');
 

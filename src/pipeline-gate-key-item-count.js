@@ -1,6 +1,6 @@
 const fs = require('fs');
 const path = require('path');
-const { GOTO_OPTS } = require('../macromatix/browser');
+const { GOTO_OPTS } = require('./mmx-browser');
 const {
     openCountInProgressTab,
     isOnNewCountTab,
@@ -12,9 +12,9 @@ const {
     selectCountOptionByIndex,
     readAppliedStatusBelowCount,
     isAppliedInCountHeader,
-} = require('../macromatix/navigation');
-const { withPageContextRetry } = require('../macromatix/contextRetry');
-const log = require('../utils/logging');
+} = require('./mmx-navigation');
+const { withPageContextRetry } = require('./mmx-context-retry');
+const log = require('./util-logging');
 
 function gateUrlConfigured(gate) {
     return Boolean(gate && gate.url && !String(gate.url).includes('REPLACE'));

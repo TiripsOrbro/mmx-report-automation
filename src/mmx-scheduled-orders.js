@@ -2,12 +2,12 @@
  * Scheduled orders list — vendor table + list date (default tomorrow).
  * New orders: Create link. Existing orders: Process link (still updatable, never Submit).
  */
-const { GOTO_OPTS } = require('./browser');
-const { withPageContextRetry } = require('../macromatix/contextRetry');
-const { setReportListDate } = require('./radDatePicker');
-const { selectStore } = require('../pipeline/supplyChainReports');
-const { resolveReportDate } = require('../utils/dates');
-const log = require('../utils/logging');
+const { GOTO_OPTS } = require('./mmx-browser');
+const { withPageContextRetry } = require('./mmx-context-retry');
+const { setReportListDate } = require('./mmx-rad-date-picker');
+const { selectStore } = require('./pipeline-supply-chain-reports');
+const { resolveReportDate } = require('./util-dates');
+const log = require('./util-logging');
 
 const DEFAULT_URL = 'https://tacobellau.macromatix.net/mms_stores_scheduledorders.aspx';
 

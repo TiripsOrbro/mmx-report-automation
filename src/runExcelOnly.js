@@ -8,9 +8,9 @@
 const path = require('path');
 const fs = require('fs');
 const { getSettings, ROOT, loadJson, logTemplateLocalChoice } = require('./config');
-const { runExcelTransform } = require('./pipeline/excelTransform');
-const { copyFileSafe, ensureDir, timestampSlug } = require('./utils/files');
-const log = require('./utils/logging');
+const { runExcelTransform } = require('./pipeline-excel-transform');
+const { copyFileSafe, ensureDir, timestampSlug } = require('./util-files');
+const log = require('./util-logging');
 
 function resolveSampleReports(settings, cliPaths) {
     if (cliPaths.length) {
@@ -85,6 +85,10 @@ async function main() {
     if (result.syncedPaths?.length) {
         log.info('Extra copies (MMX_TEMPLATE_SYNC):');
         result.syncedPaths.forEach((p) => log.info(`  ${p}`));
+    }
+    if (result.exportedPdfTabs?.length) {
+        log.info('Exported tab PDFs:');
+        result.exportedPdfTabs.forEach((item) => log.info(`  ${item.tabName}: ${item.pdfPath}`));
     }
     log.info('Paste payload (for later MMX step):', result.pasteValuesPath);
     process.exit(0);

@@ -12,8 +12,8 @@
 const path = require('path');
 const { spawn } = require('child_process');
 const { ROOT, getSettings } = require('./config');
-const { isPipelineDoneToday, msUntilNextGateSession } = require('./utils/dailyLock');
-const log = require('./utils/logging');
+const { isPipelineDoneToday, msUntilNextGateSession } = require('./util-daily-lock');
+const log = require('./util-logging');
 
 const TZ = process.env.MMX_TIME_ZONE || process.env.DASHBOARD_TIME_ZONE || 'Australia/Melbourne';
 const START_HOUR = Number(process.env.MMX_GATE_SCHEDULE_START ?? 8);

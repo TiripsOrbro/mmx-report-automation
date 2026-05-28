@@ -1,12 +1,12 @@
 const path = require('path');
 const fs = require('fs');
-const { GOTO_OPTS } = require('../macromatix/browser');
-const { withPageContextRetry } = require('../macromatix/contextRetry');
-const { ensureDir, waitForNewDownload, timestampSlug } = require('../utils/files');
-const log = require('../utils/logging');
-const { navigateToSupplyChainReports } = require('../macromatix/navigation');
-const { runSupplyChainReport, isSupplyChainReport } = require('./supplyChainReports');
-const { runStoreReport, isStoreReport } = require('./storeReports');
+const { GOTO_OPTS } = require('./mmx-browser');
+const { withPageContextRetry } = require('./mmx-context-retry');
+const { ensureDir, waitForNewDownload, timestampSlug } = require('./util-files');
+const log = require('./util-logging');
+const { navigateToSupplyChainReports } = require('./mmx-navigation');
+const { runSupplyChainReport, isSupplyChainReport } = require('./pipeline-supply-chain-reports');
+const { runStoreReport, isStoreReport } = require('./pipeline-store-reports');
 
 const DOWNLOAD_EXTS = ['.xls', '.xlsx', '.csv'];
 
@@ -15,6 +15,10 @@ function reportsConfigured(reports) {
         if (isSupplyChainReport(r) || isStoreReport(r)) return Boolean(r.reportName);
         return r.url && !r.url.includes('REPLACE');
     });
+}
+
+function getReportDownloadDir(settings) {
+    return settings.reportDownloadDir || settings.downloadDir;
 }
 
 async function configureDownloadPath(page, downloadDir) {
@@ -104,18 +108,18 @@ async function downloadSupplyChainReport(page, report, settings) {
     await runSupplyChainReport(page, report, settings);
 
     const downloaded = await waitForReportDownload(
-        settings.downloadDir,
+        getReportDownloadDir(settings),
         settings.downloadWaitMs,
         report.downloadExt
     );
     const ext = path.extname(downloaded) || report.downloadExt || '.xls';
     const slug = timestampSlug();
-    const dest = path.join(settings.downloadDir, `${slug}-${report.id || 'report'}${ext}`);
+    const dest = path.join(getReportDownloadDir(settings), `${slug}-${report.id || 'report'}${ext}`);
     if (downloaded !== dest) {
         fs.renameSync(downloaded, dest);
     }
     await validateReportHeaders(dest, report.expectedHeaders);
-    log.info(`Saved ${report.id} → ${dest}`);
+    log.info(`Downloaded ${report.id} (temporary, discarded after merge)`);
     return dest;
 }
 
@@ -124,18 +128,18 @@ async function downloadStoreReport(page, report, settings) {
     await runStoreReport(page, report, settings);
 
     const downloaded = await waitForReportDownload(
-        settings.downloadDir,
+        getReportDownloadDir(settings),
         settings.downloadWaitMs,
         report.downloadExt || '.csv'
     );
     const ext = path.extname(downloaded) || report.downloadExt || '.csv';
     const slug = timestampSlug();
-    const dest = path.join(settings.downloadDir, `${slug}-${report.id || 'report'}${ext}`);
+    const dest = path.join(getReportDownloadDir(settings), `${slug}-${report.id || 'report'}${ext}`);
     if (downloaded !== dest) {
         fs.renameSync(downloaded, dest);
     }
     await validateReportHeaders(dest, report.expectedHeaders);
-    log.info(`Saved ${report.id} → ${dest}`);
+    log.info(`Downloaded ${report.id} (temporary, discarded after merge)`);
     return dest;
 }
 
@@ -161,7 +165,7 @@ async function downloadReports(page, settings) {
         return paths;
     }
 
-    await configureDownloadPath(page, settings.downloadDir);
+    await configureDownloadPath(page, getReportDownloadDir(settings));
 
     for (const report of reports) {
         if (report.skip) continue;
@@ -190,16 +194,16 @@ async function downloadReports(page, settings) {
             await clickExportExcelDataOnly(page, report);
         });
 
-        const downloaded = await waitForReportDownload(settings.downloadDir, settings.downloadWaitMs);
+        const downloaded = await waitForReportDownload(getReportDownloadDir(settings), settings.downloadWaitMs);
         const ext = path.extname(downloaded) || '.xlsx';
         const slug = timestampSlug();
-        const dest = path.join(settings.downloadDir, `${slug}-${report.id || 'report'}${ext}`);
+        const dest = path.join(getReportDownloadDir(settings), `${slug}-${report.id || 'report'}${ext}`);
         if (downloaded !== dest) {
             fs.renameSync(downloaded, dest);
         }
         await validateReportHeaders(dest, report.expectedHeaders);
         paths[report.id] = dest;
-        log.info(`Saved ${report.id} → ${dest}`);
+        log.info(`Downloaded ${report.id} (temporary, discarded after merge)`);
     }
 
     return paths;

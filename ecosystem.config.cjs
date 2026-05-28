@@ -7,7 +7,7 @@
  */
 const path = require('path');
 const fs = require('fs');
-const { platformEnvSuffix } = require('./src/utils/platform');
+const { platformEnvSuffix } = require('./src/util-platform');
 
 const ROOT = __dirname;
 

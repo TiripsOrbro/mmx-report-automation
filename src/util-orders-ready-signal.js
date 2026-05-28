@@ -1,8 +1,8 @@
 const fs = require('fs');
 const path = require('path');
-const { resolveConfigPath } = require('../config');
+const { resolveConfigPath } = require('./config');
 
-const ROOT = path.join(__dirname, '..', '..');
+const ROOT = path.join(__dirname, '..');
 
 function resolveSignalPath() {
     const env = String(process.env.DASHBOARD_ORDERS_READY_FILE || '').trim();

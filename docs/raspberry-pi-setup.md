@@ -48,8 +48,8 @@ Copy your workbook (not in git):
 
 ```bash
 mkdir -p data/workbooks
-# Copy Build To JS.xlsx from your PC or server, e.g. scp:
-# scp user@pc:"path/Build To JS.xlsx" ~/mmx-report-automation/data/workbooks/
+# Copy Build To.xlsx from your PC or server, e.g. scp:
+# scp user@pc:"path/Build To.xlsx" ~/mmx-report-automation/data/workbooks/
 ```
 
 ---
@@ -390,11 +390,11 @@ rm -f data/out/pipeline-complete-today.json
 ## 12. Production checklist
 
 - [ ] Chromium installed and `SCRAPER_EXECUTABLE_PATH` set
-- [ ] `Build To JS.xlsx` in `data/workbooks/`
+- [ ] Build To workbook path configured in `.env` (`MMX_BUILD_TO_DIR_*` + `MMX_BUILD_TO_FILENAME`)
 - [ ] `.env.production` mode `600`, credentials filled
 - [ ] `npm run setup` and `config/*.json` reviewed
 - [ ] `npm run login` + `gate-check` succeeded once
-- [ ] `npm run dry-run` produced files in `data/inbox/`
+- [ ] `npm run dry-run` completed and removed temporary downloads (`data/out/tmp-report-downloads`)
 - [ ] `npm start` completed all vendor orders once
 - [ ] `./deploy/systemd/install-units.sh <user>` run
 - [ ] `mmx-gate-watch.service` enabled (Restart=always)

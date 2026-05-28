@@ -3,11 +3,11 @@
 const path = require('path');
 const fs = require('fs');
 const { getSettings } = require('../src/config');
-const { launchBrowser, loginMacromatix } = require('../src/macromatix/auth');
-const { GOTO_OPTS } = require('../src/macromatix/browser');
-const { probeGatePage, evaluateGateComplete } = require('../src/pipeline/gateKeyItemCount');
-const { ensureDir } = require('../src/utils/files');
-const log = require('../src/utils/logging');
+const { launchBrowser, loginMacromatix } = require('../src/mmx-auth');
+const { GOTO_OPTS } = require('../src/mmx-browser');
+const { probeGatePage, evaluateGateComplete } = require('../src/pipeline-gate-key-item-count');
+const { ensureDir } = require('../src/util-files');
+const log = require('../src/util-logging');
 
 const STOCK_COUNT_URL =
     'https://tacobellau.macromatix.net/MMS_Stores_StockCount.aspx?MenuCustomItemID=156';

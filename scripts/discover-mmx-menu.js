@@ -8,10 +8,10 @@
 const path = require('path');
 const fs = require('fs');
 const { getSettings, ROOT } = require('../src/config');
-const { launchBrowser, loginMacromatix } = require('../src/macromatix/auth');
-const { BASE_URL, GOTO_OPTS } = require('../src/macromatix/browser');
-const { ensureDir } = require('../src/utils/files');
-const log = require('../src/utils/logging');
+const { launchBrowser, loginMacromatix } = require('../src/mmx-auth');
+const { BASE_URL, GOTO_OPTS } = require('../src/mmx-browser');
+const { ensureDir } = require('../src/util-files');
+const log = require('../src/util-logging');
 
 const KEYWORDS = /key|item|count|stock|inventory|hand|order|build/i;
 

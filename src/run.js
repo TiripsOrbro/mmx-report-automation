@@ -18,16 +18,17 @@
 const path = require('path');
 const fs = require('fs');
 const { getSettings, ROOT, logTemplateLocalChoice } = require('./config');
-const { launchBrowser, loginMacromatix } = require('./macromatix/auth');
-const { isKeyItemCountComplete, gateUrlConfigured } = require('./pipeline/gateKeyItemCount');
-const { downloadReports, openReportsHub, reportsConfigured } = require('./pipeline/downloadReports');
-const { runExcelTransform } = require('./pipeline/excelTransform');
-const { uploadToMacromatix } = require('./pipeline/uploadToMacromatix');
-const { runVendorOrderEntry } = require('./pipeline/enterVendorOrders');
-const { ensureDir, archiveFile } = require('./utils/files');
-const { isPipelineDoneToday, markPipelineDoneToday } = require('./utils/dailyLock');
-const { shouldSignalOrdersReady, signalOrdersReadyForReview } = require('./utils/ordersReadySignal');
-const log = require('./utils/logging');
+const { launchBrowser, loginMacromatix } = require('./mmx-auth');
+const { isKeyItemCountComplete, gateUrlConfigured } = require('./pipeline-gate-key-item-count');
+const { downloadReports, openReportsHub, reportsConfigured } = require('./pipeline-download-reports');
+const { runExcelTransform } = require('./pipeline-excel-transform');
+const { uploadToMacromatix } = require('./pipeline-upload-to-macromatix');
+const { runVendorOrderEntry } = require('./pipeline-enter-vendor-orders');
+const { sendPdfEmail } = require('./util-email-pdfs');
+const { ensureDir, cleanupReportDownloads } = require('./util-files');
+const { isPipelineDoneToday, markPipelineDoneToday } = require('./util-daily-lock');
+const { shouldSignalOrdersReady, signalOrdersReadyForReview } = require('./util-orders-ready-signal');
+const log = require('./util-logging');
 
 const args = new Set(process.argv.slice(2));
 const forceRun = args.has('--force');
@@ -90,7 +91,7 @@ async function main() {
     ensureConfigExists();
     const settings = getSettings();
     logTemplateLocalChoice(settings);
-    ensureDir(settings.downloadDir);
+    ensureDir(settings.reportDownloadDir);
     ensureDir(settings.outDir);
     ensureDir(path.dirname(settings.templateLocal));
     if (settings.userDataDir) {
@@ -106,6 +107,16 @@ async function main() {
 
     let browser;
     let page;
+    let reportPaths = {};
+    const reportDownloadDir = settings.reportDownloadDir;
+
+    function disposeReportDownloads() {
+        if (!Object.keys(reportPaths).length) return;
+        const removed = cleanupReportDownloads(reportPaths, reportDownloadDir);
+        reportPaths = {};
+        log.info(`Removed ${removed} temporary report download(s)`);
+    }
+
     try {
         ({ browser, page } = await launchBrowser(settings));
         await loginMacromatix(page, {
@@ -195,7 +206,7 @@ async function main() {
             log.info('Download mode: Inventory Special Event (AC and RGM only) only');
         }
 
-        const reportPaths = await downloadReports(page, {
+        reportPaths = await downloadReports(page, {
             ...settings,
             pipeline: { ...settings.pipeline, reports: reportsToRun },
         });
@@ -215,8 +226,14 @@ async function main() {
             if (Object.keys(reportPaths).length) {
                 const result = await runExcelTransform(settings, reportPaths);
                 log.info('Excel merge complete:', result.templatePath);
+                await sendPdfEmail({
+                    email: settings.email,
+                    pdfExports: result.exportedPdfTabs,
+                    templatePath: result.templatePath,
+                    isDryRun: dryRun,
+                });
             }
-            log.info('Inventory Special Event download complete:', reportPaths);
+            log.info('Inventory Special Event download complete');
             process.exit(0);
         }
 
@@ -228,9 +245,15 @@ async function main() {
         }
 
         const excelResult = await runExcelTransform(settings, reportPaths);
-
+        await sendPdfEmail({
+            email: settings.email,
+            pdfExports: excelResult.exportedPdfTabs,
+            templatePath: excelResult.templatePath,
+            isDryRun: dryRun,
+        });
         if (dryRun) {
             log.info('Dry-run: skipping vendor order entry');
+            disposeReportDownloads();
             await browser.close().catch(() => {});
             browser = null;
             process.exit(0);
@@ -268,20 +291,13 @@ async function main() {
             log.info('MMX_KEEP_BROWSER_OPEN is set but full pipeline already closed the browser after orders.');
         }
 
-        for (const p of Object.values(reportPaths)) {
-            try {
-                archiveFile(p, path.join(settings.outDir, 'archived-downloads'));
-            } catch (e) {
-                log.warn(`Could not archive ${p}: ${e.message}`);
-            }
-        }
-
         log.info('Pipeline finished successfully');
         process.exit(0);
     } catch (err) {
         log.error(err.message, err.stack);
         process.exit(1);
     } finally {
+        disposeReportDownloads();
         if (browser) {
             await browser.close().catch(() => {});
         }

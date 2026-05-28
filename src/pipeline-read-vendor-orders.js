@@ -1,7 +1,7 @@
 const ExcelJS = require('exceljs');
-const { colLettersToNum } = require('../utils/sourceWorkbook');
-const { ceilOrderQuantity } = require('../utils/quantity');
-const log = require('../utils/logging');
+const { colLettersToNum } = require('./util-source-workbook');
+const { ceilOrderQuantity } = require('./util-quantity');
+const log = require('./util-logging');
 
 function cellPlainValue(cell) {
     if (!cell || cell.value == null) return null;

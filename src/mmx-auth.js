@@ -1,9 +1,9 @@
 const crypto = require('crypto');
 const puppeteer = require('puppeteer');
-const { BASE_URL, GOTO_OPTS, getPuppeteerLaunchOptions } = require('./browser');
-const { patchPageWaitForTimeout } = require('../utils/delay');
-const { clearChromeProfileSingletonLocks } = require('../utils/files');
-const log = require('../utils/logging');
+const { BASE_URL, GOTO_OPTS, getPuppeteerLaunchOptions } = require('./mmx-browser');
+const { patchPageWaitForTimeout } = require('./util-delay');
+const { clearChromeProfileSingletonLocks } = require('./util-files');
+const log = require('./util-logging');
 
 function decryptCredentialPayload(encryptedPayload, keyText) {
     if (!encryptedPayload || !keyText) return null;

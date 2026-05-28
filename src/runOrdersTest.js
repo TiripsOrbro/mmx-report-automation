@@ -9,9 +9,9 @@
  * Uses scheduled orders date from config (default tomorrow). Update only — never Submit.
  */
 const { getSettings, loadJson } = require('./config');
-const { launchBrowser, loginMacromatix } = require('./macromatix/auth');
-const { runVendorOrderEntry } = require('./pipeline/enterVendorOrders');
-const log = require('./utils/logging');
+const { launchBrowser, loginMacromatix } = require('./mmx-auth');
+const { runVendorOrderEntry } = require('./pipeline-enter-vendor-orders');
+const log = require('./util-logging');
 
 function parseArgs() {
     const argv = process.argv.slice(2);

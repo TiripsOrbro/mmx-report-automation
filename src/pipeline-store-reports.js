@@ -1,5 +1,5 @@
-const { withPageContextRetry } = require('../macromatix/contextRetry');
-const { resolveReportDate } = require('../utils/dates');
+const { withPageContextRetry } = require('./mmx-context-retry');
+const { resolveReportDate } = require('./util-dates');
 const {
     openReportSelectionPage,
     setGroupDropdown,
@@ -8,7 +8,7 @@ const {
     setStartDate,
     selectStore,
     clickGenerate,
-} = require('./supplyChainReports');
+} = require('./pipeline-supply-chain-reports');
 
 function dateOpts(report) {
     return { timeZone: report.timeZone, dateOnly: Boolean(report.dateOnly) };

@@ -1,8 +1,8 @@
-const { GOTO_OPTS } = require('../macromatix/browser');
-const { withPageContextRetry } = require('../macromatix/contextRetry');
-const { setReportStartDate, setReportEndDate } = require('../macromatix/radDatePicker');
-const { resolveReportDate } = require('../utils/dates');
-const log = require('../utils/logging');
+const { GOTO_OPTS } = require('./mmx-browser');
+const { withPageContextRetry } = require('./mmx-context-retry');
+const { setReportStartDate, setReportEndDate } = require('./mmx-rad-date-picker');
+const { resolveReportDate } = require('./util-dates');
+const log = require('./util-logging');
 
 async function openReportSelectionPage(page, reportNav, navTimeoutMs) {
     log.info(`Opening Report Selection: ${reportNav.url}`);
