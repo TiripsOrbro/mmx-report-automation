@@ -17,7 +17,7 @@
  */
 const path = require('path');
 const fs = require('fs');
-const { getSettings, ROOT, logTemplateLocalChoice } = require('./config');
+const { getSettings, ROOT, logTemplateLocalChoice, resolveConfigPath } = require('./config');
 const { launchBrowser, loginMacromatix } = require('./mmx-auth');
 const { isKeyItemCountComplete, gateUrlConfigured } = require('./pipeline-gate-key-item-count');
 const { downloadReports, openReportsHub, reportsConfigured } = require('./pipeline-download-reports');
@@ -73,6 +73,39 @@ function isFullPipelineRun() {
         !dryRun &&
         !ordersOnly
     );
+}
+
+function prepareWorkbookEmailAttachments(settings, templatePath) {
+    const attachmentsDir = path.join(settings.outDir, 'email-workbooks');
+    ensureDir(attachmentsDir);
+
+    const attachments = [];
+    const buildToCopy = path.join(attachmentsDir, path.basename(templatePath || 'Build To.xlsx'));
+    if (templatePath && fs.existsSync(templatePath)) {
+        fs.copyFileSync(templatePath, buildToCopy);
+        attachments.push(buildToCopy);
+    } else {
+        log.warn(`Workbook attachment source not found: ${templatePath}`);
+    }
+
+    const manualFilename = String(process.env.MMX_MANUAL_FILL_FILENAME || 'Build To Manual Fill.xlsx').trim();
+    const manualPathRaw = String(process.env.MMX_MANUAL_FILL_PATH || '').trim();
+    const manualSourcePath = manualPathRaw
+        ? resolveConfigPath(manualPathRaw, ROOT)
+        : path.join(path.dirname(templatePath), manualFilename);
+
+    if (manualSourcePath && fs.existsSync(manualSourcePath)) {
+        const manualCopy = path.join(attachmentsDir, path.basename(manualSourcePath));
+        fs.copyFileSync(manualSourcePath, manualCopy);
+        attachments.push(manualCopy);
+    } else {
+        log.warn(
+            `Manual fill workbook not found for email attachment: ${manualSourcePath}. ` +
+                'Set MMX_MANUAL_FILL_PATH if it lives outside the Build To folder.'
+        );
+    }
+
+    return attachments;
 }
 
 async function ensureConfigExists() {
@@ -229,6 +262,7 @@ async function main() {
                 await sendPdfEmail({
                     email: settings.email,
                     pdfExports: result.exportedPdfTabs,
+                    workbookAttachments: prepareWorkbookEmailAttachments(settings, result.templatePath),
                     templatePath: result.templatePath,
                     isDryRun: dryRun,
                 });
@@ -248,6 +282,7 @@ async function main() {
         await sendPdfEmail({
             email: settings.email,
             pdfExports: excelResult.exportedPdfTabs,
+            workbookAttachments: prepareWorkbookEmailAttachments(settings, excelResult.templatePath),
             templatePath: excelResult.templatePath,
             isDryRun: dryRun,
         });

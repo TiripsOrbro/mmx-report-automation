@@ -152,6 +152,7 @@ Cross-platform behaviour in code:
 - `MMX_EMAIL_SMTP_HOST` / `MMX_EMAIL_SMTP_PORT` / `MMX_EMAIL_SMTP_SECURE` — SMTP connection settings
 - `MMX_EMAIL_SMTP_USER` / `MMX_EMAIL_SMTP_PASS` — SMTP auth credentials
 - `MMX_EMAIL_FROM` / `MMX_EMAIL_TO` / `MMX_EMAIL_CC` — sender and recipients (`MMX_EMAIL_TO` supports `;` separators)
+- `MMX_MANUAL_FILL_PATH` / `MMX_MANUAL_FILL_FILENAME` — optional manual-fill workbook attachment source (defaults to `Build To Manual Fill.xlsx` beside Build To workbook)
 
 ## Commands
 

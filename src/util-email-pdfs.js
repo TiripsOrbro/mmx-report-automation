@@ -13,7 +13,7 @@ function validateEmailSettings(email) {
     return missing;
 }
 
-async function sendPdfEmail({ email, pdfExports, templatePath, isDryRun }) {
+async function sendPdfEmail({ email, pdfExports, workbookAttachments = [], templatePath, isDryRun }) {
     if (!email?.enabled) return { sent: false, skipped: 'email-disabled' };
     if (isDryRun && !email.sendOnDryRun) {
         log.info('Email skipped during dry-run (MMX_EMAIL_SEND_ON_DRY_RUN=false)');
@@ -45,10 +45,15 @@ async function sendPdfEmail({ email, pdfExports, templatePath, isDryRun }) {
         day: '2-digit',
     });
     const subject = `${email.subjectPrefix} - ${today}`;
-    const attachments = pdfExports.map((item) => ({
+    const pdfAttachments = pdfExports.map((item) => ({
         filename: path.basename(item.pdfPath),
         path: item.pdfPath,
     }));
+    const workbookFileAttachments = (workbookAttachments || []).map((filePath) => ({
+        filename: path.basename(filePath),
+        path: filePath,
+    }));
+    const attachments = [...pdfAttachments, ...workbookFileAttachments];
 
     const bodyLines = [
         email.body,
@@ -66,7 +71,9 @@ async function sendPdfEmail({ email, pdfExports, templatePath, isDryRun }) {
         attachments,
     });
 
-    log.info(`Sent PDF email to ${email.to.join(', ')} (${attachments.length} attachment(s))`);
+    log.info(
+        `Sent PDF email to ${email.to.join(', ')} (${pdfAttachments.length} PDF(s), ${workbookFileAttachments.length} workbook(s))`
+    );
     return { sent: true, attachments: attachments.length };
 }
 
