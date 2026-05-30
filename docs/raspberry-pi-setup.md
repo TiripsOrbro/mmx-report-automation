@@ -66,14 +66,7 @@ chmod 600 .env.production
 
 The **EDIT THESE** section at the top of `.env.production` is all you need for a first deploy. Optional settings stay below the divider. See `.env.pi.example` in the repo for the full template.
 
-Optional: point at the dashboard env so credentials stay in one place:
-
-```bash
-# In .env.production, or symlink after copying values:
-# source ../live-dashboard-app/.env.production patterns
-```
-
-`config.js` also loads `../live-dashboard-app/.env` when present (fills empty vars only).
+This app is fully independent of live-dashboard-app. Set its own `SCRAPER_USERNAME` / `SCRAPER_PASSWORD` in this app's `.env` (or `.env.production`) — it no longer reads the dashboard's env files.
 
 ---
 

@@ -29,36 +29,6 @@ function loadEnv() {
     loadEnvFile('.env');
     loadEnvFile(`.env.${platformEnvSuffix()}`, { override: true });
     loadEnvFile('.env.production', { override: true });
-
-    loadSiblingEnv('../live-dashboard-app/.env', { fillEmpty: true });
-    loadSiblingEnv('../live-dashboard-app/.env.production', { fillEmpty: true });
-
-    if (/^(1|true|yes|on)$/i.test(String(process.env.MMX_USE_DASHBOARD_CREDENTIALS ?? '').trim())) {
-        loadSiblingEnv('../live-dashboard-app/.env.production', {
-            override: true,
-            keys: ['SCRAPER_USERNAME', 'SCRAPER_PASSWORD', 'SCRAPER_CREDENTIALS_ENCRYPTED', 'SCRAPER_CREDENTIALS_KEY'],
-        });
-        loadSiblingEnv('../live-dashboard-app/.env', {
-            override: true,
-            keys: ['SCRAPER_USERNAME', 'SCRAPER_PASSWORD', 'SCRAPER_CREDENTIALS_ENCRYPTED', 'SCRAPER_CREDENTIALS_KEY'],
-        });
-    }
-}
-
-function loadSiblingEnv(relPath, { override = false, fillEmpty = false, keys = null } = {}) {
-    const p = path.join(ROOT, relPath);
-    if (!fs.existsSync(p)) return;
-
-    const parsed = require('dotenv').parse(fs.readFileSync(p));
-    for (const [key, value] of Object.entries(parsed)) {
-        if (value == null || value === '') continue;
-        if (keys && !keys.includes(key)) continue;
-        if (override) {
-            process.env[key] = value;
-        } else if (fillEmpty && (process.env[key] === undefined || process.env[key] === '')) {
-            process.env[key] = value;
-        }
-    }
 }
 
 /** Resolve env path: absolute/UNC as-is; relative paths from `baseDir` (repo root by default). */

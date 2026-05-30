@@ -49,7 +49,7 @@ Optional: enable SMTP email sending to automatically email generated PDF attachm
 
 ### Macromatix login + key item gate
 
-Uses the same `SCRAPER_USERNAME` / `SCRAPER_PASSWORD` as the dashboard (mmx `.env` or `../live-dashboard-app/.env`).
+Reads `SCRAPER_USERNAME` / `SCRAPER_PASSWORD` from this app's own `.env` (this app is fully independent of live-dashboard-app — it does not read the dashboard's `.env`).
 
 ```bash
 # First time: visible browser (optional)
