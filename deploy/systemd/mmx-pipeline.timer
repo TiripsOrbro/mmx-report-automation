@@ -3,7 +3,8 @@ Description=Run Macromatix full pipeline daily
 
 [Timer]
 OnCalendar=*-*-* 11:00:00
-Persistent=true
+# false = do not catch up a missed 11:00 run after a mid-day reboot
+Persistent=false
 Unit=mmx-pipeline.service
 
 [Install]

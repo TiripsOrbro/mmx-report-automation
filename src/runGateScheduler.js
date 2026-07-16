@@ -3,6 +3,7 @@
  * Automatic Orders — scheduled gate checks (8 AM–before 11 PM store time).
  * When the key-item gate is READY and today's pipeline has not run yet,
  * starts the full pipeline (reports → Excel → vendor order entry) once per day.
+ * Restarts never run immediately — always wait for the next schedule slot.
  *
  *   npm run automatic-orders
  *
@@ -175,18 +176,11 @@ async function main() {
         `Automatic Orders: ${intervalLabel} gate checks, ${windowLabel()}; full pipeline once per day when gate is READY.`
     );
 
+    // Never run on startup/restart — wait for the next scheduled interval so a
+    // mid-day process restart (git pull, crash recovery, reboot) cannot trigger
+    // the daily pipeline early.
     if (await sleepUntilNextGateSession(workDir)) {
         // resumed next day
-    } else if (isWithinWindow()) {
-        const { minute } = localHourMinute();
-        const atIntervalStart =
-            CHECK_INTERVAL_MINUTES >= 60
-                ? minute < 5
-                : minute % CHECK_INTERVAL_MINUTES < 5;
-        if (atIntervalStart) {
-            const gateCode = await runGateCheck();
-            await maybeRunPipelineAfterGate(workDir, gateCode);
-        }
     }
 
     // eslint-disable-next-line no-constant-condition

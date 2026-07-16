@@ -219,7 +219,8 @@ Description=Run Macromatix pipeline daily
 
 [Timer]
 OnCalendar=*-*-* 11:00:00
-Persistent=true
+# false = skip catch-up if the Pi was offline at 11:00 (avoids mid-day runs after reboot)
+Persistent=false
 Unit=mmx-pipeline.service
 
 [Install]
