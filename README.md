@@ -87,6 +87,20 @@ npm run gate-watch
 
 Leave this running in a terminal or register it as a Windows scheduled task / service. Configure hours with `MMX_GATE_SCHEDULE_START` / `MMX_GATE_SCHEDULE_END` in `.env`.
 
+### Continuous sales + labour workers
+
+**Replacement for the old interval scraper** lives in `live-dashboard-app`, not this repo.
+
+When `SCRAPER_PERSISTENT_SESSIONS=1` and `SCRAPER_CONTINUOUS_WORKERS=1` in the dashboard `.env`, the dashboard starts one worker per store (login once, labour Day view refresh every 2 min) instead of the old full-market scrape cycle.
+
+```bash
+# In live-dashboard-app:
+npm run continuous-scrapers          # long-running workers
+npm run test-continuous-scrapers     # short timed smoke test
+```
+
+This repo's `npm run continuous-scrapers` delegates to the dashboard runner above.
+
 ## Configuration
 
 ### Edit these first
@@ -143,6 +157,14 @@ Cross-platform behaviour in code:
 - `MMX_TEMPLATE_LOCAL` — legacy optional semicolon-separated workbook list
 - `MMX_TEMPLATE_PUBLISH` — optional write-back to server after merge
 - `MMX_USER_DATA_DIR` — Chrome profile for saved login session (default `./data/browser-profile`)
+- `MMX_CONTINUOUS_REQUIRE_PERSISTENT_PROFILE` — keep `true` to block long-lived workers when using ephemeral browser
+- `MMX_LABOUR_STORES` — store list for labour workers (defaults to `MMX_STORE_NAME`)
+- `MMX_LABOUR_REFRESH_MINUTES` — labour Day view refresh cadence (default `2`)
+- `MMX_SALES_INTERVAL_MINUTES` — sales loop cadence (default matches labour refresh)
+- `MMX_SALES_REPORT_URL` / `MMX_SALES_READY_SELECTOR` — optional sales target page and readiness selector
+- `MMX_LABOUR_SCHEDULER_URL` — labour scheduler URL to keep open for refresh scraping
+- `MMX_LABOUR_DAY_VIEW_SELECTOR` / `MMX_LABOUR_STORE_INPUT_SELECTOR` / `MMX_LABOUR_STORE_APPLY_SELECTOR` / `MMX_LABOUR_READY_SELECTOR` — optional labour UI selectors for Day/store selection and page readiness
+- `MMX_WORKER_RETRY_BACKOFF_SECONDS` / `MMX_WORKER_MAX_RETRY_BACKOFF_SECONDS` — worker retry backoff controls
 - `MMX_STORE_NAME` — store to select in reports tree (default `3811 Chirnside Park`)
 - `MMX_PDF_EXPORT_ENABLED` — when true, export configured workbook tabs to PDF after recalc
 - `MMX_PDF_EXPORT_TABS` — semicolon/comma/newline-separated workbook tab names to export
@@ -168,6 +190,7 @@ Cross-platform behaviour in code:
 | `npm run dry-run` | Gate + download + Excel merge; skip Macromatix paste submit |
 | `npm start` | Full pipeline |
 | `npm run gate-watch` | Hourly gate check (9 AM–11 PM); pauses until tomorrow after full pipeline; Pi: systemd |
+| `npm run continuous-scrapers` | Independent sales + labour loops with persistent logged-in sessions |
 
 Exit codes: `0` success or gate skipped (not ready); `1` error.
 
@@ -211,7 +234,7 @@ mmx-report-automation/
 | | Dashboard | This app |
 |---|-----------|----------|
 | Express UI | Yes | No |
-| Sales labour scrape | Yes | No |
+| Sales labour scrape | Yes (continuous workers when `SCRAPER_CONTINUOUS_WORKERS=1`) | Delegates to dashboard |
 | Puppeteer + MMX login | Yes | Yes (duplicated auth module) |
 | exceljs | No | Yes |
 | Scheduled with dashboard | No — use separate job |

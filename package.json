@@ -12,6 +12,7 @@
     "gate-check": "node src/run.js --gate-only",
     "gate-watch": "node src/runGateScheduler.js",
     "automatic-orders": "node src/runGateScheduler.js",
+    "continuous-scrapers": "node src/runContinuousScrapers.js",
     "reports-hub": "node src/run.js --reports-hub",
     "download-on-hand": "node src/run.js --download-on-hand",
     "download-on-order": "node src/run.js --download-on-order",
